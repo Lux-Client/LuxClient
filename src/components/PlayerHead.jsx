@@ -37,21 +37,34 @@ const PlayerHead = ({ src, uuid, name, size = 40, className = "" }) => {
     };
     const headPos = "14.285% 14.285%";
     const hatPos = "71.428% 14.285%";
-    if (!src || !src.startsWith('http')) {
-        const fallbackUrl = uuid
-            ? `https://crafatar.com/avatars/${uuid}?size=${size}&overlay`
-            : `https://crafatar.com/avatars/${name || 'Steve'}?size=${size}&overlay`;
+    const isTextureUrl = src && (src.includes('textures.minecraft.net') || src.includes('skin') || src.length > 100);
 
+    if (!isTextureUrl) {
+        const getHeadUrl = () => {
+            if (src && src.startsWith('http')) return src;
+            if (uuid) return `https://crafatar.com/avatars/${uuid}?size=${size}&overlay`;
+            if (name) return `https://crafatar.com/avatars/${name}?size=${size}&overlay`;
+            return `https://crafatar.com/avatars/steve?size=${size}&overlay`;
+        };
         return (
             <div style={baseStyle} className={className}>
                 <img
-                    src={fallbackUrl}
+                    src={getHeadUrl()}
                     alt="Head"
                     style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
                         imageRendering: 'pixelated'
+                    }}
+                    onError={(e) => {
+                        if (e.target.src.includes(uuid || name || 'steve')) {
+                            e.target.src = `https://crafatar.com/avatars/steve?size=${size}&overlay`;
+                        } else {
+                            e.target.src = uuid
+                                ? `https://crafatar.com/avatars/${uuid}?size=${size}&overlay`
+                                : `https://crafatar.com/avatars/steve?size=${size}&overlay`;
+                        }
                     }}
                 />
             </div>

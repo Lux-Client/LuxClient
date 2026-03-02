@@ -25,10 +25,13 @@ function RightPanel({ userProfile, onProfileUpdate }) {
     }, [userProfile]);
 
     const loadLiveSkin = async () => {
-        if (userProfile?.skinUrl) {
+        if (!userProfile?.access_token) return;
+
+        if (userProfile.skinUrl) {
             setLiveSkin(userProfile.skinUrl);
             return;
         }
+
         try {
             const res = await window.electronAPI.getCurrentSkin(userProfile.access_token);
             if (res.success && res.url) {

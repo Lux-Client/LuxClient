@@ -124,7 +124,13 @@ function App() {
                     const profile = await window.electronAPI.getProfile();
                     if (profile) {
                         try {
-                            const skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                            // Try to prefetch skin URL with a small retry
+                            let skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                            if (!skinRes.success) {
+                                // Small delay then retry once
+                                await new Promise(r => setTimeout(r, 1000));
+                                skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                            }
                             if (skinRes.success) {
                                 profile.skinUrl = skinRes.url;
                             }
@@ -341,12 +347,18 @@ function App() {
     const handleLoginSuccess = async (profile) => {
         if (profile && profile.access_token && window.electronAPI.getCurrentSkin) {
             try {
-                const skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                // Try to prefetch skin URL with a small retry
+                let skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                if (!skinRes.success) {
+                    // Small delay then retry once
+                    await new Promise(r => setTimeout(r, 1000));
+                    skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
+                }
                 if (skinRes.success) {
                     profile.skinUrl = skinRes.url;
                 }
             } catch (e) {
-                console.error("Login: Failed to prefetch skin", e);
+                console.error("Failed to prefetch skin", e);
             }
         }
         let startPage = 'dashboard';
