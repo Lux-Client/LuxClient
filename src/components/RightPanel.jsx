@@ -33,7 +33,6 @@ function RightPanel({ userProfile, onProfileUpdate }) {
             const res = await window.electronAPI.getCurrentSkin(userProfile.access_token);
             if (res.success && res.url) {
                 setLiveSkin(res.url);
-                // Propagate to global state
                 if (onProfileUpdate) {
                     onProfileUpdate({
                         ...userProfile,

@@ -738,7 +738,7 @@
         "and": "a",
         "opt_out": "Odhlásenie z analytiky",
         "tos_url": "https://mclc.pluginhub.de/imprint.html",
-        "privacy_url": "https://mclc.pluginhub.de/privacy-policy-en.html",
-        "opt_out_url": "https://mclc.pluginhub.de/analytics-opt-out-en.html"
+        "privacy_url": "https://mclc.pluginhub.de/privacy-policy.html",
+        "opt_out_url": "https://mclc.pluginhub.de/analytics-opt-out.html"
     }
 }

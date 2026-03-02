@@ -38,8 +38,6 @@ const PlayerHead = ({ src, uuid, name, size = 40, className = "" }) => {
     const headPos = "14.285% 14.285%";
     const hatPos = "71.428% 14.285%";
     if (!src || !src.startsWith('http')) {
-        // Use crafatar.com as it's more reliable and provides better head renders
-        // Default size for Minecraft heads is 8, but 64 is good for avatars
         const fallbackUrl = uuid
             ? `https://crafatar.com/avatars/${uuid}?size=${size}&overlay`
             : `https://crafatar.com/avatars/${name || 'Steve'}?size=${size}&overlay`;
