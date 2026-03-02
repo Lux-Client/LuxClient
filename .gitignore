@@ -77,8 +77,9 @@ coverage/
 neoforge_profile.json
 run/
 *.minecraft/
+web/
+
 bun.lock
 debug_forge_profile.js
 check_syntax.js
 updateLocales.js
-web/
