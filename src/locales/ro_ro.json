@@ -287,6 +287,7 @@
         "save_btn": "Salvează Setările",
         "saved_success": "Setări salvate cu succes",
         "save_failed": "Eșec la salvarea setărilor",
+        "advanced_settings": "Setări avansate",
         "general": {
             "title": "General",
             "startup_page": "Pagină de Pornire",

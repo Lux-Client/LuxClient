@@ -287,6 +287,7 @@
         "save_btn": "Salvar Configurações",
         "saved_success": "Configurações salvas com sucesso",
         "save_failed": "Falha ao salvar configurações",
+        "advanced_settings": "Configurações avançadas",
         "general": {
             "title": "Geral",
             "startup_page": "Página Inicial",

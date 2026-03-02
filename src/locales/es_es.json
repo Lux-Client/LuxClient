@@ -288,6 +288,7 @@
         "save_btn": "Guardar cambios",
         "saved_success": "Ajustes guardados correctamente",
         "save_failed": "Error al guardar",
+        "advanced_settings": "Ajustes avanzados",
         "general": {
             "title": "General",
             "startup_page": "Página inicial",

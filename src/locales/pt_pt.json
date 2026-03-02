@@ -287,6 +287,7 @@
         "save_btn": "Guardar Definições",
         "saved_success": "Definições guardadas com sucesso",
         "save_failed": "Falha ao guardar definições",
+        "advanced_settings": "Definições avançadas",
         "general": {
             "title": "Geral",
             "startup_page": "Página Inicial",

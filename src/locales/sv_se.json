@@ -287,6 +287,7 @@
         "save_btn": "Spara inställningar",
         "saved_success": "Inställningar sparades",
         "save_failed": "Kunde inte spara inställningar",
+        "advanced_settings": "Avancerade inställningar",
         "general": {
             "title": "Allmänt",
             "startup_page": "Startsida",

@@ -288,6 +288,7 @@
         "save_btn": "Save Settings",
         "saved_success": "Settings saved",
         "save_failed": "Could not save settings",
+        "advanced_settings": "Advanced Settings",
         "general": {
             "title": "General",
             "startup_page": "Startup Page",

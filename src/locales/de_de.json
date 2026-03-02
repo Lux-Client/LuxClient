@@ -288,6 +288,7 @@
         "save_btn": "Einstellungen speichern",
         "saved_success": "Einstellungen gespeichert",
         "save_failed": "Einstellungen konnten nicht gespeichert werden",
+        "advanced_settings": "Erweiterte Einstellungen",
         "general": {
             "title": "Allgemein",
             "startup_page": "Startseite",

@@ -287,6 +287,7 @@
         "save_btn": "Zapisz ustawienia",
         "saved_success": "Ustawienia zapisane pomyślnie",
         "save_failed": "Nie udało się zapisać ustawień",
+        "advanced_settings": "Ustawienia zaawansowane",
         "general": {
             "title": "Ogólne",
             "startup_page": "Strona startowa",

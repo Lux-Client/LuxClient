@@ -287,6 +287,7 @@
         "save_btn": "Uložiť nastavenia",
         "saved_success": "Nastavenia boli úspešne uložené",
         "save_failed": "Nepodarilo sa uložiť nastavenia",
+        "advanced_settings": "Pokročilé nastavenia",
         "general": {
             "title": "Všeobecné",
             "startup_page": "Úvodná stránka",

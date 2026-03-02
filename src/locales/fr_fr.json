@@ -288,6 +288,7 @@
         "save_btn": "Enregistrer les paramètres",
         "saved_success": "Paramètres enregistrés avec succès",
         "save_failed": "Échec de l'enregistrement des paramètres",
+        "advanced_settings": "Paramètres avancés",
         "general": {
             "title": "Général",
             "startup_page": "Page de démarrage",
