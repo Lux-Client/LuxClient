@@ -14,7 +14,8 @@ const ServerSettings = React.lazy(() => import('./pages/ServerSettings'));
 const ServerSearch = React.lazy(() => import('./pages/ServerSearch'));
 const ServerLibrary = React.lazy(() => import('./pages/ServerLibrary'));
 const InstanceDetails = React.lazy(() => import('./pages/InstanceDetails'));
-const OpenClient = React.lazy(() => import('./pages/OpenClient'));
+const Client = React.lazy(() => import('./pages/Client'));
+const ClientMods = React.lazy(() => import('./pages/ClientMods'));
 const Extensions = React.lazy(() => import('./pages/Extensions'));
 const Login = React.lazy(() => import('./pages/Login'));
 const News = React.lazy(() => import('./pages/News'));
@@ -22,6 +23,7 @@ import { isFeatureEnabled } from './config/featureFlags';
 
 import Sidebar from './components/Sidebar';
 import ServerSidebar from './components/ServerSidebar';
+import ClientSidebar from './components/ClientSidebar';
 import UpdateNotification from './components/UpdateNotification';
 import RightPanel from './components/RightPanel';
 import AgreementModal from './components/AgreementModal';
@@ -620,7 +622,7 @@ function App() {
                             <ExtensionSlot name="header.right" className="flex items-center gap-2 mr-2" />
 
                             { }
-                            <div className="relative h-full flex items-center" ref={sessionsRef}>
+                            <div className="relative h-full flex items-center gap-2" ref={sessionsRef}>
                                 {isFeatureEnabled('openClientPage') && currentMode === 'launcher' && (
                                     <button
                                         onClick={() => handleModeSelect('client')}
@@ -727,32 +729,37 @@ function App() {
                     </div>
 
                     <div className="flex flex-1 overflow-hidden">
-                        {currentMode !== 'client' && (
-                            <>
-                                {currentMode === 'launcher' ? (
-                                    <Sidebar
-                                        currentView={currentView}
-                                        setView={setCurrentView}
-                                        onLogout={handleLogout}
-                                        onInstanceClick={handleInstanceClick}
-                                        onCreateInstance={() => { setCurrentView('library'); setTriggerCreateInstance(true); }}
-                                        isGuest={isGuest}
-                                        isCollapsed={isSidebarCollapsed}
-                                        setIsCollapsed={setIsSidebarCollapsed}
-                                    />
-                                ) : (
-                                    <ServerSidebar
-                                        currentView={currentView}
-                                        setView={setCurrentView}
-                                        onLogout={handleLogout}
-                                        isCollapsed={isSidebarCollapsed}
-                                        setIsCollapsed={setIsSidebarCollapsed}
-                                    />
-                                )}
-                            </>
-                        )}
+                        {currentMode === 'launcher' ? (
+                            <Sidebar
+                                currentView={currentView}
+                                setView={setCurrentView}
+                                onLogout={handleLogout}
+                                onInstanceClick={handleInstanceClick}
+                                onCreateInstance={() => { setCurrentView('library'); setTriggerCreateInstance(true); }}
+                                isGuest={isGuest}
+                                isCollapsed={isSidebarCollapsed}
+                                setIsCollapsed={setIsSidebarCollapsed}
+                            />
+                        ) : currentMode === 'server' ? (
+                            <ServerSidebar
+                                currentView={currentView}
+                                setView={setCurrentView}
+                                onLogout={handleLogout}
+                                isCollapsed={isSidebarCollapsed}
+                                setIsCollapsed={setIsSidebarCollapsed}
+                            />
+                        ) : isFeatureEnabled('openClientPage') ? (
+                            <ClientSidebar
+                                currentView={currentView}
+                                setView={setCurrentView}
+                                onLogout={handleLogout}
+                                isGuest={isGuest}
+                                isCollapsed={isSidebarCollapsed}
+                                setIsCollapsed={setIsSidebarCollapsed}
+                            />
+                        ) : null}
 
-                        <main className={`flex-1 my-4 ${currentMode === 'client' ? 'mx-4' : (isSidebarCollapsed ? 'ml-4 mr-2' : 'ml-2 mr-2')} bg-surface/10 relative overflow-hidden flex flex-col rounded-2xl border border-white/5 shadow-2xl transition-all duration-300`}
+                        <main className={`flex-1 my-4 ${isSidebarCollapsed ? 'ml-4 mr-2' : 'ml-2 mr-2'} bg-surface/10 relative overflow-hidden flex flex-col rounded-2xl border border-white/5 shadow-2xl transition-all duration-300`}
                             style={{ backdropFilter: `blur(${theme.glassBlur}px)` }}
                         >
 
@@ -805,7 +812,14 @@ function App() {
                                     )}
 
                                     {currentMode === 'client' && isFeatureEnabled('openClientPage') && (
-                                        <OpenClient />
+                                        <>
+                                            {currentView === 'open-client' && <Client />}
+                                            {currentView === 'skins' && !isGuest && <Skins onLogout={handleLogout} onProfileUpdate={setUserProfile} />}
+                                            {currentView === 'extensions' && <Extensions />}
+                                            {currentView === 'styling' && <Styling />}
+                                            {currentView === 'mods' && <ClientMods />}
+                                            {currentView === 'settings' && <Settings mode="client" />}
+                                        </>
                                     )}
 
                                     {currentView === 'news' && <News />}
@@ -816,16 +830,14 @@ function App() {
                             </div>
                         </main>
 
-                        {currentMode !== 'client' && (
-                            <div
-                                className="my-4 ml-2 mr-4 bg-surface/10 z-10 flex flex-col rounded-2xl border border-white/5 shadow-2xl"
-                                style={{ backdropFilter: `blur(${theme.glassBlur}px)` }}
-                            >
-                                <div className="flex-1 overflow-hidden">
-                                    <RightPanel userProfile={userProfile} onProfileUpdate={setUserProfile} />
-                                </div>
+                        <div
+                            className="my-4 ml-2 mr-4 bg-surface/10 z-10 flex flex-col rounded-2xl border border-white/5 shadow-2xl"
+                            style={{ backdropFilter: `blur(${theme.glassBlur}px)` }}
+                        >
+                            <div className="flex-1 overflow-hidden">
+                                <RightPanel userProfile={userProfile} onProfileUpdate={setUserProfile} />
                             </div>
-                        )}
+                        </div>
                     </div>
                     <UpdateNotification />
                 </div>

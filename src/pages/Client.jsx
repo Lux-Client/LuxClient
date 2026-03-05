@@ -1,22 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
+import { resolveClientAutoInstallModIds } from '../config/clientDefaults';
 
-const DEFAULT_OPEN_CLIENT_MOD_IDS = [
-    'P7dR8mSH', // Fabric API
-    'AANobbMI', // Sodium
-    'gvQqBUqZ', // Lithium
-    '5ZwdcRci', // ImmediatelyFast
-    'nmDcB62a', // ModernFix
-    'YL57xq9U', // Iris
-    'iAiqcykM', // Just Zoom
-    'PtjYWJkn', // Sodium Extra
-    'Bh37bMuy', // Reese's Sodium Options
-    'LQ3K71Q1', // Dynamic FPS
-    'OVuFYfre', // Enhanced Block Entities
-];
-
-function OpenClient() {
+function Client() {
     const { t } = useTranslation();
     const { addNotification } = useNotification();
 
@@ -36,12 +23,9 @@ function OpenClient() {
 
     const resolveConfiguredModIds = (settings) => {
         if (Array.isArray(settings?.openClientAutoInstallMods)) {
-            return settings.openClientAutoInstallMods.filter((item) => typeof item === 'string' && item.trim());
+            return resolveClientAutoInstallModIds(settings.openClientAutoInstallMods);
         }
-        if (settings?.enableAutoInstallMods && Array.isArray(settings?.autoInstallMods)) {
-            return settings.autoInstallMods.filter((item) => typeof item === 'string' && item.trim());
-        }
-        return DEFAULT_OPEN_CLIENT_MOD_IDS;
+        return resolveClientAutoInstallModIds();
     };
 
     const loadVersions = async () => {
@@ -78,7 +62,7 @@ function OpenClient() {
                 setSelectedVersion('');
             }
         } catch (error) {
-            console.error('[OpenClient] Failed to load versions:', error);
+            console.error('[Client] Failed to load versions:', error);
             addNotification(t('client_page.errors.load_versions', 'Could not load versions.'), 'error');
             setAvailableVersions([]);
             setSelectedVersion('');
@@ -92,7 +76,7 @@ function OpenClient() {
             const list = await window.electronAPI.getInstances();
             setInstances(Array.isArray(list) ? list : []);
         } catch (error) {
-            console.error('[OpenClient] Failed to load instances:', error);
+            console.error('[Client] Failed to load instances:', error);
         }
     };
 
@@ -103,7 +87,7 @@ function OpenClient() {
                 setConfiguredModIds(resolveConfiguredModIds(settingsRes.settings));
             }
         } catch (error) {
-            console.error('[OpenClient] Failed to load settings:', error);
+            console.error('[Client] Failed to load settings:', error);
         }
     };
 
@@ -141,7 +125,7 @@ function OpenClient() {
             });
             setUpdates(nextUpdates);
         } catch (error) {
-            console.error('[OpenClient] Failed to check updates:', error);
+            console.error('[Client] Failed to check updates:', error);
             setUpdates({});
         }
     };
@@ -174,7 +158,7 @@ function OpenClient() {
                     installedCount += 1;
                 }
             } catch (error) {
-                console.error(`[OpenClient] Failed to auto-install mod ${projectId}:`, error);
+                console.error(`[Client] Failed to auto-install mod ${projectId}:`, error);
             }
         }
 
@@ -261,7 +245,7 @@ function OpenClient() {
                     loaderVersion = loaderRes.versions[0].version;
                 }
             } catch (error) {
-                console.warn('[OpenClient] Failed to resolve loader version, fallback to latest:', error);
+                console.warn('[Client] Failed to resolve loader version, fallback to latest:', error);
             }
 
             const baseName = `Client ${selectedVersion}`;
@@ -420,4 +404,4 @@ function OpenClient() {
     );
 }
 
-export default OpenClient;
+export default Client;

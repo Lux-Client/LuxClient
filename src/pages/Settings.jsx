@@ -5,9 +5,10 @@ import { isFeatureEnabled } from '../config/featureFlags';
 import ToggleBox from '../components/ToggleBox';
 import ConfirmationModal from '../components/ConfirmationModal';
 
-function Settings() {
+function Settings({ mode = 'default' }) {
     const { t, i18n } = useTranslation();
     const { addNotification } = useNotification();
+    const isClientSettings = mode === 'client';
     const [settings, setSettings] = useState({
         javaPath: '',
         javaArgs: '-Xmx4G',
@@ -446,22 +447,24 @@ function Settings() {
                     <h2 className="text-lg font-bold mb-6 text-white">{t('settings.general.title')}</h2>
 
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <div className="flex-1 min-w-[200px]">
-                                <div className="font-medium text-white">{t('settings.general.startup_page')}</div>
-                                <div className="text-sm text-gray-500 mt-1">{t('settings.general.startup_page_desc')}</div>
+                        {!isClientSettings && (
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                                <div className="flex-1 min-w-[200px]">
+                                    <div className="font-medium text-white">{t('settings.general.startup_page')}</div>
+                                    <div className="text-sm text-gray-500 mt-1">{t('settings.general.startup_page_desc')}</div>
+                                </div>
+                                <select
+                                    value={settings.startPage || 'dashboard'}
+                                    onChange={(e) => handleChange('startPage', e.target.value)}
+                                    className="bg-background border border-white/10 rounded-xl px-4 pr-10 py-2.5 text-sm focus:border-primary outline-none text-gray-300 cursor-pointer min-w-[180px]"
+                                >
+                                    <option value="dashboard">{t('common.dashboard')}</option>
+                                    <option value="library">{t('common.library')}</option>
+                                </select>
                             </div>
-                            <select
-                                value={settings.startPage || 'dashboard'}
-                                onChange={(e) => handleChange('startPage', e.target.value)}
-                                className="bg-background border border-white/10 rounded-xl px-4 pr-10 py-2.5 text-sm focus:border-primary outline-none text-gray-300 cursor-pointer min-w-[180px]"
-                            >
-                                <option value="dashboard">{t('common.dashboard')}</option>
-                                <option value="library">{t('common.library')}</option>
-                            </select>
-                        </div>
+                        )}
 
-                        <div className="flex items-center justify-between pt-6 border-t border-white/5 gap-4 flex-wrap">
+                        <div className={`flex items-center justify-between gap-4 flex-wrap ${isClientSettings ? '' : 'pt-6 border-t border-white/5'}`}>
                             <div className="flex-1 min-w-[200px]">
                                 <div className="font-medium text-white">{t('settings.general.language')}</div>
                                 <div className="text-sm text-gray-500 mt-1">{t('settings.general.language_desc')}</div>
@@ -493,13 +496,15 @@ function Settings() {
                             </select>
                         </div>
 
-                        <ToggleBox
-                            className="pt-6 border-t border-white/5"
-                            checked={settings.showQuickSwitchButton || false}
-                            onChange={(val) => handleChange('showQuickSwitchButton', val)}
-                            label={t('settings.general.quick_switch_button')}
-                            description={t('settings.general.quick_switch_button_desc')}
-                        />
+                        {!isClientSettings && (
+                            <ToggleBox
+                                className="pt-6 border-t border-white/5"
+                                checked={settings.showQuickSwitchButton || false}
+                                onChange={(val) => handleChange('showQuickSwitchButton', val)}
+                                label={t('settings.general.quick_switch_button')}
+                                description={t('settings.general.quick_switch_button_desc')}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -703,32 +708,34 @@ function Settings() {
                 </div>
 
                 { }
-                <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
-                    <h2 className="text-lg font-bold mb-6 text-white">{t('settings.instance.title')}</h2>
+                {!isClientSettings && (
+                    <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                        <h2 className="text-lg font-bold mb-6 text-white">{t('settings.instance.title')}</h2>
 
-                    <ToggleBox
-                        checked={settings.copySettingsEnabled || false}
-                        onChange={(val) => handleChange('copySettingsEnabled', val)}
-                        label={t('settings.instance.copy_settings')}
-                        description={t('settings.instance.copy_settings_desc')}
-                    />
+                        <ToggleBox
+                            checked={settings.copySettingsEnabled || false}
+                            onChange={(val) => handleChange('copySettingsEnabled', val)}
+                            label={t('settings.instance.copy_settings')}
+                            description={t('settings.instance.copy_settings_desc')}
+                        />
 
-                    {settings.copySettingsEnabled && (
-                        <div>
-                            <label className="block text-gray-400 text-sm font-medium mb-2">{t('settings.instance.source_instance')}</label>
-                            <select
-                                value={settings.copySettingsSourceInstance || ''}
-                                onChange={(e) => handleChange('copySettingsSourceInstance', e.target.value)}
-                                className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary outline-none font-mono text-gray-300"
-                            >
-                                <option value="">Select an instance...</option>
-                                {instances.map((inst) => (
-                                    <option key={inst.name} value={inst.name}>{inst.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                </div>
+                        {settings.copySettingsEnabled && (
+                            <div>
+                                <label className="block text-gray-400 text-sm font-medium mb-2">{t('settings.instance.source_instance')}</label>
+                                <select
+                                    value={settings.copySettingsSourceInstance || ''}
+                                    onChange={(e) => handleChange('copySettingsSourceInstance', e.target.value)}
+                                    className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary outline-none font-mono text-gray-300"
+                                >
+                                    <option value="">Select an instance...</option>
+                                    {instances.map((inst) => (
+                                        <option key={inst.name} value={inst.name}>{inst.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 { }
                 <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
@@ -777,24 +784,28 @@ function Settings() {
                             description={t('settings.integration.minimal_mode_desc', 'Automatically minimize the launcher to the taskbar when a game starts.')}
                         />
                     )}
-                    <ToggleBox
-                        className="mt-4 pt-4 border-t border-white/5"
-                        checked={settings.optimization || false}
-                        onChange={(val) => handleChange('optimization', val)}
-                        label={'Enable Optimization Mods'}
-                        description={t('settings.integration.optimization_desc')}
-                    />
-                    <ToggleBox
-                        className="mt-4 pt-4 border-t border-white/5"
-                        checked={settings.enableAutoInstallMods || false}
-                        onChange={(val) => handleChange('enableAutoInstallMods', val)}
-                        label={t('settings.integration.auto_mod_install')}
-                        description={t('settings.integration.auto_mod_install_desc')}
-                    />
+                    {!isClientSettings && (
+                        <ToggleBox
+                            className="mt-4 pt-4 border-t border-white/5"
+                            checked={settings.optimization || false}
+                            onChange={(val) => handleChange('optimization', val)}
+                            label={'Enable Optimization Mods'}
+                            description={t('settings.integration.optimization_desc')}
+                        />
+                    )}
+                    {!isClientSettings && (
+                        <ToggleBox
+                            className="mt-4 pt-4 border-t border-white/5"
+                            checked={settings.enableAutoInstallMods || false}
+                            onChange={(val) => handleChange('enableAutoInstallMods', val)}
+                            label={t('settings.integration.auto_mod_install')}
+                            description={t('settings.integration.auto_mod_install_desc')}
+                        />
+                    )}
                 </div>
 
                 { }
-                {settings.enableAutoInstallMods && (
+                {!isClientSettings && settings.enableAutoInstallMods && (
                     <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors mt-6">
                         <h2 className="text-lg font-bold mb-6 text-white">{t('settings.auto_install.management_title')}</h2>
                         <p className="text-sm text-gray-400 mb-4">{t('settings.auto_install.management_desc')}</p>
