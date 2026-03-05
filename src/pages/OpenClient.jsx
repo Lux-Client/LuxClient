@@ -3,9 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 
 const DEFAULT_OPEN_CLIENT_MOD_IDS = [
-    'AANobbMI', // Sodium
     'P7dR8mSH', // Fabric API
-    'YL57xq9U' // Iris
+    'AANobbMI', // Sodium
+    'gvQqBUqZ', // Lithium
+    '5ZwdcRci', // ImmediatelyFast
+    'nmDcB62a', // ModernFix
+    'YL57xq9U', // Iris
+    'iAiqcykM', // Just Zoom
+    'PtjYWJkn', // Sodium Extra
+    'Bh37bMuy', // Reese's Sodium Options
+    'LQ3K71Q1', // Dynamic FPS
+    'OVuFYfre', // Enhanced Block Entities
 ];
 
 function OpenClient() {
@@ -366,9 +374,9 @@ function OpenClient() {
                         ? t('client_page.loading_versions', 'Loading versions...')
                         : isInstalling
                             ? `${t('common.installing', 'Installing...')} (${Math.round(installState.progress)}%)`
-                        : isInstalled
-                            ? t('client_page.installed_state', 'Installed')
-                            : t('client_page.not_installed_state', 'Not installed')}
+                            : isInstalled
+                                ? t('client_page.installed_state', 'Installed')
+                                : t('client_page.not_installed_state', 'Not installed')}
                 </div>
 
                 <div className="mt-4">

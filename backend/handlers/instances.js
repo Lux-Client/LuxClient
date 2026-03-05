@@ -661,7 +661,8 @@ module.exports = (ipcMain, win) => {
                                 'NRjRiSSD',
                                 'J81TRJWm',
                                 '9s6osm5g',
-                                'LQ3K71Q1'
+                                'LQ3K71Q1',
+                                'OVuFYfre'
                             ];
                             const fallbackMods = ['GchcoXML', '4ZqxOvjD'];
 
