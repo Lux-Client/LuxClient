@@ -381,7 +381,9 @@
         "memory": {
             "title": "Allocation de la mémoire",
             "min": "Minimum (Mo)",
-            "max": "Maximum (Mo)"
+            "max": "Maximum (Mo)",
+            "java_profile": "Profil de performance Java",
+            "java_profile_desc": "Les drapeaux d'Aikar sont recommandés pour la plupart des instances moddées pour éviter les micro-saccades."
         },
         "resolution": {
             "title": "Résolution",
@@ -655,7 +657,9 @@
             "path_placeholder": "Laissez vide pour utiliser la valeur globale par défaut",
             "memory_label": "Allocation de mémoire (Mo)",
             "min_memory": "Mémoire minimale",
-            "max_memory": "Mémoire maximale"
+            "max_memory": "Mémoire maximale",
+            "profile_label": "Profil de performance Java",
+            "profile_desc": "Remplace le paramètre global du lanceur pour cette instance."
         },
         "hooks": {
             "title": "Crochets de lancement",

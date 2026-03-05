@@ -310,8 +310,6 @@ function App() {
             }
         });
 
-        document.addEventListener('mousedown', handleClickOutside);
-
         return () => {
             if (removeInstallListener) removeInstallListener();
             if (removeLaunchProgressListener) removeLaunchProgressListener();

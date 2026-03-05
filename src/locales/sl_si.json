@@ -380,7 +380,9 @@
         "memory": {
             "title": "Dodelitev pomnilnika",
             "min": "Najmanj (MB)",
-            "max": "Največ (MB)"
+            "max": "Največ (MB)",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Ločljivost",
@@ -654,7 +656,9 @@
             "path_placeholder": "Pustite prazno za uporabo globalne privzete nastavitve",
             "memory_label": "Dodelitev pomnilnika (MB)",
             "min_memory": "Najmanj",
-            "max_memory": "Največ"
+            "max_memory": "Največ",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Zagonske skripte (Hooks)",

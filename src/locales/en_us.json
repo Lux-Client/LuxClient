@@ -388,7 +388,9 @@
         "memory": {
             "title": "Memory Allocation",
             "min": "Minimum (MB)",
-            "max": "Maximum (MB)"
+            "max": "Maximum (MB)",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Resolution",
@@ -662,7 +664,9 @@
             "path_placeholder": "Leave blank to use global default",
             "memory_label": "Memory (MB)",
             "min_memory": "Minimum",
-            "max_memory": "Maximum"
+            "max_memory": "Maximum",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Launch Hooks",

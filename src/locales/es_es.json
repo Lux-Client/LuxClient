@@ -386,7 +386,9 @@
         "memory": {
             "title": "Asignación de memoria",
             "min": "Mínimo (MB)",
-            "max": "Máximo (MB)"
+            "max": "Máximo (MB)",
+            "java_profile": "Perfil de rendimiento de Java",
+            "java_profile_desc": "Los parámetros de Aikar se recomiendan para la mayoría de las instancias con mods para evitar micro-tirones."
         },
         "resolution": {
             "title": "Resolución",
@@ -660,7 +662,9 @@
             "path_placeholder": "Déjalo en blanco para usar el valor global",
             "memory_label": "Memoria asignada (MB)",
             "min_memory": "Mínimo",
-            "max_memory": "Máximo"
+            "max_memory": "Máximo",
+            "profile_label": "Perfil de rendimiento de Java",
+            "profile_desc": "Sobrescribe el ajuste global del lanzador para esta instancia."
         },
         "hooks": {
             "title": "Comandos de inicio (Hooks)",

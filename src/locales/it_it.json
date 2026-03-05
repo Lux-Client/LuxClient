@@ -380,7 +380,9 @@
         "memory": {
             "title": "Allocazione Memoria",
             "min": "Minima (MB)",
-            "max": "Massima (MB)"
+            "max": "Massima (MB)",
+            "java_profile": "Profilo di prestazioni Java",
+            "java_profile_desc": "I parametri di Aikar sono consigliati per la maggior parte delle istanze moddate per prevenire micro-scatti."
         },
         "resolution": {
             "title": "Risoluzione",
@@ -654,7 +656,9 @@
             "path_placeholder": "Lascia vuoto per usare il valore predefinito globale",
             "memory_label": "Allocazione Memoria (MB)",
             "min_memory": "Minima",
-            "max_memory": "Massima"
+            "max_memory": "Massima",
+            "profile_label": "Profilo di prestazioni Java",
+            "profile_desc": "Sovrascrive l'impostazione globale del launcher per questa istanza."
         },
         "hooks": {
             "title": "Hook di Avvio",

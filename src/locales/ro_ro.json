@@ -380,7 +380,9 @@
         "memory": {
             "title": "Alocare Memorie",
             "min": "Minim (MB)",
-            "max": "Maxim (MB)"
+            "max": "Maxim (MB)",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Rezoluție",
@@ -654,7 +656,9 @@
             "path_placeholder": "Lasă gol pentru a utiliza setarea globală",
             "memory_label": "Alocare Memorie (MB)",
             "min_memory": "Minim",
-            "max_memory": "Maxim"
+            "max_memory": "Maxim",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Scripturi de Lansare",

@@ -639,6 +639,23 @@ function Settings() {
                 <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                     <h2 className="text-lg font-bold mb-6 text-white">{t('settings.memory.title')}</h2>
 
+                    <div className="mb-6">
+                        <label className="block text-gray-400 text-sm font-medium mb-2">{t('settings.memory.java_profile')}</label>
+                        <select
+                            value={settings.javaProfile || 'default'}
+                            onChange={(e) => handleChange('javaProfile', e.target.value)}
+                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm focus:border-primary outline-none appearance-none cursor-pointer hover:bg-black/30 transition-colors"
+                        >
+                            <option value="default">{t('common.disabled')}</option>
+                            <option value="performance">Performance (Aikar's Flags)</option>
+                            <option value="low-end">Low-End PC (Aggressive GC)</option>
+                            <option value="zgc">ZGC (Stable FPS - Java 17+)</option>
+                        </select>
+                        <p className="text-[10px] text-gray-500 mt-2 italic px-1">
+                            {t('settings.memory.java_profile_desc')}
+                        </p>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-8 mb-6">
                         <div>
                             <label className="block text-gray-400 text-sm font-medium mb-2">{t('settings.memory.min')}</label>

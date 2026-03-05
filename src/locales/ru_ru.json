@@ -380,7 +380,9 @@
         "memory": {
             "title": "Выделение памяти",
             "min": "Минимум (МБ)",
-            "max": "Максимум (МБ)"
+            "max": "Максимум (МБ)",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Разрешение экрана",
@@ -654,7 +656,9 @@
             "path_placeholder": "Оставьте пустым для использования глобального пути",
             "memory_label": "Выделение памяти (МБ)",
             "min_memory": "Минимум",
-            "max_memory": "Максимум"
+            "max_memory": "Максимум",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Хуки запуска (Команды)",

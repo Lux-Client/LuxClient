@@ -380,7 +380,9 @@
         "memory": {
             "title": "Alokacja pamięci RAM",
             "min": "Minimalna pamięć",
-            "max": "Maksimum (MB)"
+            "max": "Maksimum (MB)",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Rozdzielczość",
@@ -654,7 +656,9 @@
             "path_placeholder": "Pozostaw puste, aby użyć globalnej wartości",
             "memory_label": "Alokacja pamięci RAM (MB)",
             "min_memory": "Minimalna pamięć",
-            "max_memory": "Maksimum"
+            "max_memory": "Maksimum",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Skrypty uruchamiania (Hooks)",

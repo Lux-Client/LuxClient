@@ -380,7 +380,9 @@
         "memory": {
             "title": "Minnesallokering",
             "min": "Minsta minne",
-            "max": "Maximalt minne"
+            "max": "Maximalt minne",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Upplösning",
@@ -654,7 +656,9 @@
             "path_placeholder": "Lämna tomt för att använda global standard",
             "memory_label": "Minnesallokering (MB)",
             "min_memory": "Minsta minne",
-            "max_memory": "Maximalt minne"
+            "max_memory": "Maximalt minne",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Startkrokar (Hooks)",

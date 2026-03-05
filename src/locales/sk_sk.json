@@ -380,7 +380,9 @@
         "memory": {
             "title": "Pridelenie pamäte",
             "min": "Minimálna pamäť",
-            "max": "Maximálna pamäť"
+            "max": "Maximálna pamäť",
+            "java_profile": "Java Performance Profile",
+            "java_profile_desc": "Aikar's Flags are recommended for most modded instances to prevent 'micro-stuttering'."
         },
         "resolution": {
             "title": "Rozlíšenie",
@@ -654,7 +656,9 @@
             "path_placeholder": "Nechajte prázdne pre použitie globálnej hodnoty",
             "memory_label": "Pridelenie pamäte (MB)",
             "min_memory": "Minimálna pamäť",
-            "max_memory": "Maximálna pamäť"
+            "max_memory": "Maximálna pamäť",
+            "profile_label": "Java Performance Profile",
+            "profile_desc": "Overrides the global launcher setting for this instance."
         },
         "hooks": {
             "title": "Spúšťacie skripty (Hooks)",
