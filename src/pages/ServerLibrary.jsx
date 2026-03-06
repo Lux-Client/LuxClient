@@ -53,7 +53,6 @@ function ServerLibrary() {
         } catch (error) {
             console.error('Failed to load platforms:', error);
             addNotification(t('server_library.load_platforms_failed'), 'error');
-            // Fallback
             setPlatforms([
                 { key: 'vanilla', name: 'Vanilla' },
                 { key: 'bukkit', name: 'Bukkit' },

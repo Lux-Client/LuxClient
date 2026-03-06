@@ -2,27 +2,22 @@ const { app, BrowserWindow, ipcMain, protocol, net, Menu, Tray } = require('elec
 const fs = require('fs-extra');
 const path = require('path');
 
-// Allow Tray icon support on COSMIC desktop by spoofing Unity for AppIndicator support
 if (process.platform === 'linux' && process.env.XDG_CURRENT_DESKTOP === 'COSMIC') {
     process.env.XDG_CURRENT_DESKTOP = 'Unity';
 }
 
-// Force WebGL/GPU acceleration on Linux/unsupported systems
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
 if (process.platform === 'linux') {
-    // Sometimes necessary for WebGL on certain Linux drivers/sandboxes
     app.commandLine.appendSwitch('disable-gpu-sandbox');
-    // Forces the use of EGL, which is modern and better supported on Linux/Mesa than 'desktop' override
     app.commandLine.appendSwitch('use-gl', 'egl');
 }
 app.commandLine.appendSwitch('enable-webgl-draft-extensions');
 app.commandLine.appendSwitch('disable-features', 'NetworkServiceSandbox,CalculateNativeWinOcclusion');
 
-// Legacy Hardware Support (#8)
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 try {
     if (fs.existsSync(settingsPath)) {
@@ -37,7 +32,6 @@ try {
     console.error('[Main] Failed to read settings for legacy GPU check:', e);
 }
 
-// Redundant requires removed
 console.log('NUCLEAR STARTUP CHECK: main.js is running!');
 console.log('[DEBUG] CWD:', process.cwd());
 console.log('[DEBUG] __dirname:', __dirname);
@@ -53,7 +47,6 @@ ipcMain.handle('app:restart', () => {
     app.exit(0);
 });
 
-// fs handled at top
 const { pathToFileURL } = require('url');
 const dns = require('dns');
 if (dns.setDefaultResultOrder) {
@@ -159,7 +152,6 @@ async function checkAndLaunch() {
 
                     const downloadDir = path.join(app.getPath('userData'), 'updates');
                     await fs.ensureDir(downloadDir);
-                    // Sanitize the asset name: strip path components and validate characters
                     const safeAssetName = path.basename(asset.name).replace(/[^a-zA-Z0-9._-]/g, '_');
                     if (!safeAssetName || safeAssetName.startsWith('.')) {
                         throw new Error('Invalid update asset filename');
@@ -192,7 +184,6 @@ async function checkAndLaunch() {
                     setTimeout(() => {
                         const { spawn } = require('child_process');
                         if (process.platform === 'win32') {
-                            // VBScript to invisibly wait for the silent installer to finish, then relaunch the app.
                             const updateScript = path.join(downloadDir, 'update.vbs');
                             const exeTarget = process.execPath;
                             const vbsContent = `Set objShell = WScript.CreateObject("WScript.Shell")
@@ -203,7 +194,6 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
                             spawn('wscript.exe', [updateScript, targetPath, exeTarget], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
                         } else if (process.platform === 'linux') {
                             if (safeAssetName.endsWith('.AppImage')) {
-                                // Use a hardcoded filename to fully break the taint chain
                                 const safeUpdatePath = path.join(downloadDir, 'mclc-setup.AppImage');
                                 fs.renameSync(targetPath, safeUpdatePath);
                                 fs.chmodSync(safeUpdatePath, 0o755);
@@ -216,11 +206,10 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
                         }
                         app.quit();
                     }, 1000);
-                    return; // Stop here, don't launch main
+                    return;
                 }
             }
 
-            // No update or missing asset
             splashWindow.webContents.send('updater:status', { status: 'Starting' });
             setTimeout(launchMain, 1500);
 
@@ -228,7 +217,7 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
             console.error('[Main] Update check failed:', err);
             retryCount++;
             if (retryCount <= maxRetries) {
-                setTimeout(performCheck, 1000); // Wait 1 second before retry
+                setTimeout(performCheck, 1000);
             } else {
                 splashWindow.webContents.send('updater:status', { status: 'Starting' });
                 setTimeout(launchMain, 1500);
@@ -266,7 +255,6 @@ function createWindow() {
     });
 
     mainWindow.once('ready-to-show', () => {
-        // Delay showing main window slightly to allow splash screen to be visible
         setTimeout(() => {
             if (splashWindow) {
                 splashWindow.close();
@@ -631,7 +619,6 @@ app.whenReady().then(() => {
             }
         }
     });
-
 
 });
 

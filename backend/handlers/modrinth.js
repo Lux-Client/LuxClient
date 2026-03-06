@@ -55,7 +55,6 @@ const getFolderForServerSoftware = (software, fallbackProjectType) => {
     return getFolderForProjectType(fallbackProjectType);
 };
 
-// Must match sanitizeFileName in servers.js
 function sanitizeFileName(name) {
     return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
@@ -215,7 +214,6 @@ const installModInternal = async (win, { instanceName, serverSafeName, projectId
                     });
                 }
 
-                // Breaking the retry loop on success
                 lastError = null;
                 break;
             } catch (e) {

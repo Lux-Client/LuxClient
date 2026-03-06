@@ -576,7 +576,6 @@ eula=true
         }
     });
 
-
     app.on('before-quit', (e) => {
         console.log('[Servers] App quitting, cleaning up processes...');
 
@@ -622,7 +621,6 @@ eula=true
             return [];
         }
     });
-    // Alias for server:get-console (called by getServerLogs in preload)
     ipcMain.handle('server:get-logs', async (event, serverName) => {
         try {
             const buffer = serverConsoleBuffers.get(serverName) || [];
@@ -1698,10 +1696,7 @@ eula=false
         }
     });
 
-    /**
-     * Parse properties file format to object
-     * Supports comments, empty lines, and key=value format
-     */
+    
     function parsePropertiesFile(content) {
         const properties = {};
         const lines = content.split('\n');
@@ -1730,10 +1725,7 @@ eula=false
         return { properties, header };
     }
 
-    /**
-     * Convert properties object back to file format
-     * Preserves header comments and maintains all properties
-     */
+    
     function stringifyPropertiesFile(properties, header) {
         let content = header ? header + '\n' : '';
         const keys = Object.keys(properties).sort();

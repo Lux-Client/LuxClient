@@ -139,7 +139,7 @@ function Styling() {
     ...DEFAULT_THEME
   });
 
-  const [activeView, setActiveView] = useState("editor"); // 'editor' or 'marketplace'
+  const [activeView, setActiveView] = useState("editor");
   const [customPresets, setCustomPresets] = useState([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const fontOptions = [
@@ -399,7 +399,6 @@ function Styling() {
       hexToRgb(adjustColor(t.backgroundColor, -20)),
     );
 
-    // Only apply global background if NOT in preview mode
     if (!isPreview) {
       if (t.bgMedia && t.bgMedia.url) {
         root.style.setProperty("--bg-url", t.bgMedia.url);
@@ -414,7 +413,6 @@ function Styling() {
   const handleUpdate = (key, value) => {
     const newTheme = sanitizeTheme({ ...theme, [key]: value });
     setTheme(newTheme);
-    // Background changes are preview-only until saved
     const isBackgroundChange = key === "bgMedia" || key === "bgOverlay";
     applyTheme(newTheme, isBackgroundChange);
   };
@@ -496,7 +494,6 @@ function Styling() {
       const newSettings = { ...res.settings, theme };
       const saveRes = await window.electronAPI.saveSettings(newSettings);
       if (saveRes.success) {
-        // Apply fully, including background, once saved
         applyTheme(theme, false);
         addNotification(t('styling.saved_success'), "success");
       }

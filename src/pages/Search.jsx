@@ -119,7 +119,6 @@ function Search({ initialCategory, onCategoryConsumed }) {
             if (res.success) {
                 let finalResults = res.results;
 
-                // Promote G-Craft if on first page of Modpacks
                 if (projectType === 'modpack' && offset === 0 && !query) {
                     try {
                         const gCraftRes = await window.electronAPI.getModrinthProject('oMskb4v5');
@@ -129,7 +128,6 @@ function Search({ initialCategory, onCategoryConsumed }) {
                                 project_id: gCraftRes.project.id,
                                 project_type: 'modpack'
                             };
-                            // Avoid duplicates and pin to top
                             finalResults = [gCraft, ...finalResults.filter(r => r.project_id !== 'oMskb4v5')];
                         }
                     } catch (err) {

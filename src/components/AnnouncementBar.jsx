@@ -19,7 +19,7 @@ const AnnouncementBar = () => {
         };
 
         fetchAnnouncement();
-        const interval = setInterval(fetchAnnouncement, 60000); // Poll every minute
+        const interval = setInterval(fetchAnnouncement, 60000);
         return () => clearInterval(interval);
     }, []);
 
@@ -54,7 +54,7 @@ const AnnouncementBar = () => {
                 isItalic = false;
                 return null;
             }
-            if (/^[§&][kmn]$/i.test(part)) return null; // Unsupported
+            if (/^[§&][kmn]$/i.test(part)) return null;
 
             if (part.startsWith('§') || part.startsWith('&')) return null;
 

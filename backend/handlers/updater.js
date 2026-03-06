@@ -20,7 +20,7 @@ module.exports = (ipcMain, mainWindow) => {
             });
 
             const release = response.data;
-            const latestVersion = release.tag_name; // e.g., "v1.6.5"
+            const latestVersion = release.tag_name;
             const currentVersion = testVersionOverride || pkg.version;
 
             const comparison = compareVersions(currentVersion, latestVersion);
@@ -118,7 +118,7 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
                     spawn(filePath, [], { detached: true, stdio: 'ignore' }).unref();
                     app.quit();
                 } else {
-                    shell.openPath(path.dirname(filePath)); // Open folder for deb/rpm
+                    shell.openPath(path.dirname(filePath));
                 }
             } else {
                 shell.openPath(filePath);
@@ -137,7 +137,6 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
         return { success: true, currentVersion: version };
     });
 
-    // Helper for fully automatic update flow
     async function runAutoUpdate() {
         console.log('[Updater] Running automatic background update check...');
         try {

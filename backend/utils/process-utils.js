@@ -2,11 +2,6 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 
-/**
- * Gets CPU and Memory usage for a given process ID.
- * @param {number} pid - The process ID.
- * @returns {Promise<{cpu: number, memory: number}>}
- */
 async function getProcessStats(pid) {
     try {
         if (!pid) return { cpu: 0, memory: 0 };

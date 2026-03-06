@@ -20,7 +20,6 @@ for (const file of files) {
         const content = fs.readFileSync(filePath, 'utf-8');
         const json = JSON.parse(content);
 
-        // Add to common
         if (json.common) {
             for (const [key, val] of Object.entries(newKeys.common)) {
                 if (!json.common[key]) {
@@ -29,7 +28,6 @@ for (const file of files) {
             }
         }
 
-        // Add to extensions
         if (json.extensions) {
             for (const [key, val] of Object.entries(newKeys.extensions)) {
                 if (!json.extensions[key]) {

@@ -49,20 +49,17 @@ fs.readdirSync(localesDir).forEach(file => {
     console.log(`Processing ${file}...`);
     let content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-    // 1. Remove Search Keys
     if (content.common) {
         searchKeysToRemove.forEach(key => {
             delete content.common[key];
         });
     }
 
-    // 2. Add Java Profile to settings.memory
     if (content.settings && content.settings.memory) {
         content.settings.memory.java_profile = trans.profile;
         content.settings.memory.java_profile_desc = trans.desc_global;
     }
 
-    // 3. Add Java Profile to instance_settings.java
     if (content.instance_settings && content.instance_settings.java) {
         content.instance_settings.java.profile_label = trans.profile;
         content.instance_settings.java.profile_desc = trans.desc_instance;

@@ -4,8 +4,6 @@ import modOfTheDayData from '../data/modOfTheDay.json';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 
-
-
 function Home({ onInstanceClick, runningInstances = {}, activeDownloads = {}, onNavigateSearch, isGuest, userProfile }) {
     const { t } = useTranslation();
     const { addNotification } = useNotification();

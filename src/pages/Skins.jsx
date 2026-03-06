@@ -24,12 +24,10 @@ const SkinPreview3D = ({ src, className, model = 'classic' }) => {
             viewer.autoRotate = false;
             viewer.renderer.setPixelRatio(window.devicePixelRatio);
 
-            // Set static angled rotation like in the screenshots
             viewer.playerObject.rotation.y = 0.5;
 
             viewerRef.current = viewer;
 
-            // Handle responsiveness
             const resizeObserver = new ResizeObserver(entries => {
                 for (let entry of entries) {
                     const { width, height } = entry.contentRect;
@@ -218,7 +216,6 @@ function Skins({ onLogout, onProfileUpdate }) {
 
             skinViewerRef.current = viewer;
 
-            // Handle responsiveness for the main viewer
             const resizeObserver = new ResizeObserver(entries => {
                 for (let entry of entries) {
                     const { width, height } = entry.contentRect;
@@ -248,7 +245,6 @@ function Skins({ onLogout, onProfileUpdate }) {
         loadProfileAndSkin();
         loadLocalSkins();
 
-        // Load Focus Mode & Low Graphics settings
         window.electronAPI.getSettings().then(res => {
             if (res.success) {
                 if (res.settings.focusMode) setIsAnimating(false);
@@ -257,7 +253,6 @@ function Skins({ onLogout, onProfileUpdate }) {
         });
     }, []);
     useEffect(() => {
-        // We merged resize handling into the main init effect using ResizeObserver
     }, []);
     useEffect(() => {
         if (skinViewerRef.current) {
@@ -402,7 +397,6 @@ function Skins({ onLogout, onProfileUpdate }) {
                     res = await window.electronAPI.uploadSkinFromUrl(userProfile.access_token, pendingSkin.url, variant);
                 }
             } else if (variant !== originalVariant && currentSkinUrl) {
-                // Only variant changed, re-upload current skin URL with new variant
                 res = await window.electronAPI.uploadSkinFromUrl(userProfile.access_token, currentSkinUrl, variant);
             }
 

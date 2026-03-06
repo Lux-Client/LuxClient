@@ -58,7 +58,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
     const [isSavingPluginConfig, setIsSavingPluginConfig] = useState(false);
     const [creatingPluginFor, setCreatingPluginFor] = useState('');
 
-    // Mods/Plugins state
     const [modSearch, setModSearch] = useState('');
     const [modSearchResults, setModSearchResults] = useState([]);
     const [isSearchingMods, setIsSearchingMods] = useState(false);
@@ -83,14 +82,11 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
     const stripAnsi = (text) => {
         if (!text) return '';
-        // Strips ANSI escape codes
         const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
         let clean = text.replace(ansiRegex, '');
 
-        // Specifically target TUI line characters that clutter the log
         clean = clean.replace(/[┌┐└┘─│┤├┬┴┼═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬■●]/g, ' ');
 
-        // Remove other weird control characters
         return clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
     };
 
@@ -98,7 +94,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         const cleanLine = stripAnsi(line);
         if (!cleanLine) return;
 
-        // Match standard claim URL or "claim code: XXXX"
         const claimMatch = cleanLine.match(/https:\/\/playit\.gg\/claim\/([a-zA-Z0-9]+)/i) ||
             cleanLine.match(/claim code:\s*([a-zA-Z0-9]+)/i);
         if (claimMatch && claimMatch[1]) {
@@ -645,7 +640,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
     }, [activeTab, serverStats.history]);
     useEffect(() => {
         if (consoleLog.length > 0) {
-            // Periodic scan of the last 100 lines for the IP/claim code as fallback
             const recentLogs = consoleLog.slice(-100);
             for (const line of recentLogs) {
                 parsePlayitOutput(line);
@@ -653,7 +647,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         }
     }, [consoleLog]);
 
-    // Check if mods tab is still valid when server changes
     useEffect(() => {
         if (activeTab === 'mods' && !shouldShowModTab()) {
             setActiveTab('console');
@@ -681,7 +674,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
         return () => clearTimeout(timeout);
     }, [activeTab, modsViewMode, modSearch]);
-
 
     const checkServerStatus = async () => {
         try {
@@ -970,7 +962,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         return 'Just now';
     };
 
-    // Helper function to determine loader type
     const getLoaderType = () => {
         const software = server.software || 'vanilla';
         const lowerSoftware = software.toLowerCase();
@@ -1002,7 +993,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         const type = getLoaderType();
         return type === 'fabric-like' || type === 'hybrid' || type === 'paper-like';
     };
-
 
     const getLoaderForModrinth = (tabType) => {
         const software = server.software || 'vanilla';
@@ -1745,7 +1735,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                 Server must be running to send commands
                             </p>
                         )}
-                        {/* Publicity tab entry hint if address is known */}
+                        
                         {server.playitAddress && (
                             <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between animate-in fade-in zoom-in duration-300">
                                 <div className="flex items-center gap-3">
@@ -1782,7 +1772,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                 </div>
                             </div>
 
-                            {/* Simplified IP display if available from plugin */}
+                            
                             {server.playitAddress && (
                                 <div className="mb-8 p-6 bg-green-500/20 border border-green-500/30 rounded-2xl shadow-green-glow animate-in fade-in slide-in-from-top-4 duration-500 text-center relative group">
                                     <h3 className="text-xl font-bold text-white mb-2">Server Public!</h3>
@@ -1850,7 +1840,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                             )}
 
                             <div className="grid grid-cols-1 gap-6">
-                                {/* Option: Minecraft Plugin */}
+                                
                                 <div className={`relative group p-6 rounded-2xl border transition-all ${server.playitPluginInstalled ? 'bg-primary/5 border-primary/50 shadow-primary-glow' : 'bg-surface/40 border-white/5 hover:border-white/10'} ${!playitAvailable && !playitChecking ? 'opacity-50 grayscale' : ''}`}>
                                     <div className="flex items-start justify-between mb-4">
                                         <div className={`p-3 rounded-xl ${server.playitPluginInstalled ? 'bg-primary text-black' : 'bg-white/5 text-gray-400'}`}>
@@ -2518,7 +2508,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
-                                {/* Server Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4 md:col-span-2">
                                     <h3 className="font-bold text-white mb-4">Server Settings</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2579,7 +2569,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                {/* Gameplay Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4">
                                     <h3 className="font-bold text-white mb-4">Gameplay</h3>
                                     <div className="space-y-3">
@@ -2644,7 +2634,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                {/* World Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4">
                                     <h3 className="font-bold text-white mb-4">World</h3>
                                     <div className="space-y-3">
@@ -2678,7 +2668,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                {/* Network Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4">
                                     <h3 className="font-bold text-white mb-4">Network</h3>
                                     <div className="space-y-3">
@@ -2730,7 +2720,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                {/* Player Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4">
                                     <h3 className="font-bold text-white mb-4">Players</h3>
                                     <div className="space-y-3">
@@ -2764,7 +2754,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                {/* Advanced Settings */}
+                                
                                 <div className="bg-surface/40 rounded-xl p-4 md:col-span-2">
                                     <h3 className="font-bold text-white mb-4">Advanced Settings</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

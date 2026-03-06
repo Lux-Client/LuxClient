@@ -63,7 +63,7 @@ function Sidebar({ currentView, setView, onLogout, onInstanceClick, onCreateInst
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 calc(var(--sidebar-glow-intensity, 0) * 32px) rgba(var(--primary-color-rgb), calc(var(--sidebar-glow-intensity, 0) * 0.55))'
             }}>
 
-            {/* Header with Toggle */}
+            
             <div className="w-full px-2 pt-4 mb-2">
                 <div className="relative h-9">
                     <button
@@ -196,7 +196,7 @@ function Sidebar({ currentView, setView, onLogout, onInstanceClick, onCreateInst
                 ))}
             </div>
 
-            {/* Bottom Controls */}
+            
             <div className="w-full px-2 mt-4 flex flex-col items-center gap-2">
                 <button
                     onClick={() => setView('settings')}

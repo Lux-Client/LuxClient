@@ -29,7 +29,6 @@ module.exports = (ipcMain) => {
             const dirs = await fs.readdir(runtimesDir);
             const runtimes = [];
 
-            // 1. Scan internal runtimes
             for (const dir of dirs) {
                 const fullPath = path.join(runtimesDir, dir);
                 const stats = await fs.stat(fullPath).catch(() => null);
@@ -48,11 +47,9 @@ module.exports = (ipcMain) => {
                 }
             }
 
-            // 2. Scan system Java (Windows focusing)
             if (process.platform === 'win32') {
                 const systemJavas = await scanSystemJava();
                 for (const sj of systemJavas) {
-                    // Avoid duplicates if they happen to point to the same binary
                     if (!runtimes.some(r => r.path.toLowerCase() === sj.path.toLowerCase())) {
                         runtimes.push({
                             name: sj.name,
@@ -63,7 +60,6 @@ module.exports = (ipcMain) => {
                     }
                 }
             } else {
-                // Linux/Mac: check 'java' in PATH
                 try {
                     const { execSync } = require('child_process');
                     const javaPath = execSync('which java').toString().trim();
@@ -75,7 +71,7 @@ module.exports = (ipcMain) => {
                             type: 'system'
                         });
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) 
             }
 
             return { success: true, runtimes };
@@ -89,7 +85,6 @@ module.exports = (ipcMain) => {
         const found = [];
         const { execSync } = require('child_process');
 
-        // Check PATH
         try {
             const whereJava = execSync('where java', { encoding: 'utf8' }).split(/\r?\n/);
             for (let p of whereJava) {
@@ -102,9 +97,8 @@ module.exports = (ipcMain) => {
                     });
                 }
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) 
 
-        // Common install dirs
         const commonDirs = [
             'C:\\Program Files\\Java',
             'C:\\Program Files (x86)\\Java',
@@ -128,7 +122,7 @@ module.exports = (ipcMain) => {
                             });
                         }
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) 
             }
         }
 

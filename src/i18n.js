@@ -37,26 +37,23 @@ i18n
             sl_si: { translation: sl_si },
             sv_se: { translation: sv_se }
         },
-        lng: 'en_us', // Default language
+        lng: 'en_us',
         fallbackLng: 'en_us',
         interpolation: {
             escapeValue: false
         }
     });
 
-// Map old language codes to new ones
 const languageMap = {
     'en': 'en_us',
     'de': 'de_de'
 };
 
-// Load language from electron-store if available
 window.electronAPI?.getSettings().then(res => {
     if (res.success && res.settings.language) {
         let lang = res.settings.language;
         if (languageMap[lang]) {
             lang = languageMap[lang];
-            // Proactively update the setting to the new format
             window.electronAPI.saveSettings({ ...res.settings, language: lang });
         }
         i18n.changeLanguage(lang);

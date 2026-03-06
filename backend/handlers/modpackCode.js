@@ -8,11 +8,6 @@ const SERVER_URL = 'https://mclc.pluginhub.de';
 
 console.log('[ModpackCode-Handler] 🔧 Modul wird geladen...');
 
-/**
- * Calculates SHA1 hash of a file
- * @param {string} filePath
- * @returns {Promise<string>}
- */
 function calculateSha1(filePath) {
     return new Promise((resolve, reject) => {
         const hash = crypto.createHash('sha1');
@@ -34,7 +29,6 @@ module.exports = (ipcMain, win) => {
         try {
             const { name, mods, resourcePacks, shaders, instanceVersion, instanceLoader, instanceName } = data;
 
-            // Get current account UUID for rate limiting
             const Store = require('electron-store');
             const store = new Store();
             const profile = store.get('user_profile');
@@ -74,7 +68,7 @@ module.exports = (ipcMain, win) => {
                 instanceVersion,
                 instanceLoader,
                 keybinds: optionsContent,
-                ownerUuid // Include UUID for backend rate limiting
+                ownerUuid
             };
             const response = await axios.post(`${SERVER_URL}/api/modpack/save`, exportData, {
                 timeout: 10000,

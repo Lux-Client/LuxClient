@@ -323,7 +323,6 @@ const electronAPI = {
     restoreLocalBackup: (instanceName, backupFileName) => ipcRenderer.invoke('instance:restore-local-backup', instanceName, backupFileName),
     removeFile: (filePath) => ipcRenderer.invoke('instance:remove-file', filePath),
 
-    // Custom Updater
     checkForUpdates: () => ipcRenderer.invoke('updater:check'),
     downloadUpdate: (url, name) => ipcRenderer.invoke('updater:download', url, name),
     installUpdate: (path) => ipcRenderer.invoke('updater:install', path),

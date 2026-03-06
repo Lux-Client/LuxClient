@@ -22,9 +22,7 @@ class BackupManager {
         }
     }
 
-    /**
-     * Create a backup for a specific instance
-     */
+    
     async createBackup(instanceName) {
         const instanceDir = path.join(this.instancesDir, instanceName);
         const savesDir = path.join(instanceDir, 'saves');
@@ -92,9 +90,7 @@ class BackupManager {
         });
     }
 
-    /**
-     * Cleanup old backups based on maxBackups setting
-     */
+    
     async cleanupBackups(instanceName) {
         const instanceBackupsDir = path.join(this.backupsDir, instanceName);
         if (!(await fs.pathExists(instanceBackupsDir))) return;
@@ -126,9 +122,7 @@ class BackupManager {
         }
     }
 
-    /**
-     * Start/Restart interval scheduling
-     */
+    
     async startScheduler(instanceName, intervalMinutes) {
         this.stopScheduler(instanceName);
 

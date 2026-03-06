@@ -95,7 +95,6 @@ const clearActivity = () => {
     }
 };
 
-// Listen for settings updates to enable/disable RPC live
 app.on('settings-updated', (newSettings) => {
     const wasEnabled = isEnabled;
     isEnabled = newSettings.enableDiscordRPC !== false;

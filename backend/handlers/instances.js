@@ -944,7 +944,6 @@ module.exports = (ipcMain, win) => {
                                 if (relPath) {
                                     const dest = path.join(targetDir, relPath);
 
-                                    // Zip Slip Protection
                                     const normalizedTargetDir = path.normalize(targetDir + path.sep);
                                     const normalizedDest = path.normalize(dest);
                                     if (!normalizedDest.startsWith(normalizedTargetDir)) {
@@ -978,7 +977,6 @@ module.exports = (ipcMain, win) => {
                                 if (signal.aborted) return;
                                 const dest = path.join(targetDir, file.path);
 
-                                // Path Validation
                                 const normalizedTargetDir = path.normalize(targetDir + path.sep);
                                 const normalizedDest = path.normalize(dest);
                                 if (!normalizedDest.startsWith(normalizedTargetDir)) {
@@ -1099,7 +1097,6 @@ module.exports = (ipcMain, win) => {
                                 if (relPath) {
                                     const dest = path.join(targetDir, relPath);
 
-                                    // Zip Slip Protection
                                     const normalizedTargetDir = path.normalize(targetDir + path.sep);
                                     const normalizedDest = path.normalize(dest);
                                     if (!normalizedDest.startsWith(normalizedTargetDir)) {
@@ -1139,7 +1136,6 @@ module.exports = (ipcMain, win) => {
 
                                     const dest = path.join(modsDir, fileName);
 
-                                    // Path Validation
                                     const normalizedModsDir = path.normalize(modsDir + path.sep);
                                     const normalizedDest = path.normalize(dest);
                                     if (!normalizedDest.startsWith(normalizedModsDir)) {
@@ -1599,14 +1595,13 @@ module.exports = (ipcMain, win) => {
                                 if (forceCloud || (settings.cloudBackupSettings?.enabled && settings.cloudBackupSettings?.provider)) {
                                     let providerId = (typeof providerOverride === 'string') ? providerOverride : settings.cloudBackupSettings?.provider;
 
-                                    // If forceCloud is true but no provider selected (or invalid), try to find an active one
                                     if (forceCloud && (!providerId || typeof providerOverride !== 'string')) {
                                         const cloudStatus = store.get('cloud_backups') || {};
                                         if (cloudStatus.DROPBOX?.tokens) providerId = 'DROPBOX';
                                         else if (cloudStatus.GOOGLE_DRIVE?.tokens) providerId = 'GOOGLE_DRIVE';
                                     }
 
-                                    if (!providerId) providerId = 'GOOGLE_DRIVE'; // Final fallback
+                                    if (!providerId) providerId = 'GOOGLE_DRIVE';
 
                                     console.log(`[Instances] Emitting backup:created for ${instanceName} to ${providerId} (forceCloud: ${forceCloud})`);
                                     app.emit('backup:created', {
@@ -1692,7 +1687,6 @@ module.exports = (ipcMain, win) => {
                     const entryName = entry.entryName;
                     const normalizedEntry = path.normalize(entryName);
 
-                    // Security: Prevent path traversal (V10)
                     if (normalizedEntry.startsWith('..') || path.isAbsolute(normalizedEntry)) {
                         console.warn(`[Instances] Skipping suspicious entry in backup ZIP: ${entryName}`);
                         continue;
@@ -1717,7 +1711,6 @@ module.exports = (ipcMain, win) => {
 
         ipcMain.handle('instance:remove-file', async (_, filePath) => {
             try {
-                // Security: Ensure the path is within the instances directory
                 const resolvedPath = path.resolve(filePath);
                 if (!resolvedPath.startsWith(instancesDir)) {
                     console.error(`[Instances] Blocked attempt to delete file outside instances directory: ${resolvedPath}`);

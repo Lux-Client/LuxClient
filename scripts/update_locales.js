@@ -209,17 +209,14 @@ files.forEach(file => {
     const fileName = file.replace('.json', '');
     const langCode = fileName.split('_')[0];
 
-    // Check for specific filename match first (e.g. de_ch), then generic lang (e.g. de), then English
     const source = translationsMap[fileName] || translationsMap[langCode] || translationsMap['en'];
 
-    // Update settings.integration
     if (!data.settings) data.settings = {};
     if (!data.settings.integration) data.settings.integration = {};
 
     data.settings.integration.smart_log_analytics = source.settings.integration.smart_log_analytics;
     data.settings.integration.smart_log_analytics_desc = source.settings.integration.smart_log_analytics_desc;
 
-    // Update crash object
     data.crash = source.crash;
 
     fs.writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf8');

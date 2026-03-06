@@ -114,7 +114,6 @@ function createWindow() {
     });
     ipcMain.on('window-close', () => mainWindow.close());
 
-    // Explicitly read package.json version to ensure it works in dev and prod
     ipcMain.handle('app:get-version', () => {
         try {
             const pkg = require(path.join(__dirname, '../package.json'));
@@ -135,7 +134,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
     protocol.registerFileProtocol('extension', (request, callback) => {
-        const url = request.url.replace(/^extension:\/\//, '');
+        const url = request.url.replace(/^extension:\/\
         try {
             const decodedUrl = decodeURIComponent(url);
             const extensionsDir = path.join(app.getPath('userData'), 'extensions');
@@ -152,7 +151,6 @@ app.whenReady().then(() => {
     });
 
     createWindow();
-
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

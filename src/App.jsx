@@ -165,10 +165,8 @@ function App() {
                     const profile = await window.electronAPI.getProfile();
                     if (profile) {
                         try {
-                            // Try to prefetch skin URL with a small retry
                             let skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
                             if (!skinRes.success) {
-                                // Small delay then retry once
                                 await new Promise(r => setTimeout(r, 1000));
                                 skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
                             }
@@ -409,10 +407,8 @@ function App() {
     const handleLoginSuccess = async (profile) => {
         if (profile && profile.access_token && window.electronAPI.getCurrentSkin) {
             try {
-                // Try to prefetch skin URL with a small retry
                 let skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
                 if (!skinRes.success) {
-                    // Small delay then retry once
                     await new Promise(r => setTimeout(r, 1000));
                     skinRes = await window.electronAPI.getCurrentSkin(profile.access_token);
                 }
@@ -526,11 +522,10 @@ function App() {
                                     autoPlay muted loop playsInline
                                     preload="auto"
                                     className="absolute inset-0 w-full h-full object-cover"
-                                    style={{ transform: 'translateZ(0)' }} // HW acceleration hint
+                                    style={{ transform: 'translateZ(0)' }}
                                     onCanPlay={(e) => e.target.classList.add('opacity-100')}
                                     onError={(e) => {
                                         console.error("Background video decoding error:", e);
-                                        // Fallback to static background or color if video fails
                                         setTheme(prev => ({ ...prev, bgMedia: { ...prev.bgMedia, type: 'none' } }));
                                     }}
                                 >

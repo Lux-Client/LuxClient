@@ -38,7 +38,6 @@ const BackupManagerModal = ({ instance, onClose, worlds, onBackupStatusChange })
             const status = await window.electronAPI.cloudGetStatus();
             setCloudStatus(status);
 
-            // Set default selected provider based on connected status
             if (status.GOOGLE_DRIVE?.loggedIn) setSelectedProvider('GOOGLE_DRIVE');
             else if (status.DROPBOX?.loggedIn) setSelectedProvider('DROPBOX');
         } catch (e) {

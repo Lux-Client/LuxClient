@@ -28,13 +28,11 @@ const CrashModal = ({ isOpen, onClose, crashData, onFixApplied }) => {
                     res = await window.electronAPI.updateInstanceConfig(crashData.instanceName, { maxMemory: 4096 });
                     break;
                 case 'fix_java_version':
-                    // Trigger java auto-install/fix logic
                     res = await window.electronAPI.reinstallInstance(crashData.instanceName, 'java');
                     break;
                 case 'reinstall_instance':
                     res = await window.electronAPI.reinstallInstance(crashData.instanceName, 'full');
                     break;
-                // Add more cases as needed
                 default:
                     setFixStatus({ type: 'error', message: 'Unknown fix action.' });
                     setIsApplyingFix(false);
@@ -57,7 +55,7 @@ const CrashModal = ({ isOpen, onClose, crashData, onFixApplied }) => {
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-[#1a1a1a] w-full max-w-2xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-                {/* Header */}
+                
                 <div className="p-8 border-b border-white/5 bg-gradient-to-r from-red-500/10 to-transparent">
                     <div className="flex items-center gap-4 mb-2">
                         <div className="w-12 h-12 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-500">
@@ -72,7 +70,7 @@ const CrashModal = ({ isOpen, onClose, crashData, onFixApplied }) => {
                     </div>
                 </div>
 
-                {/* Content */}
+                
                 <div className="p-8 max-h-[60vh] overflow-y-auto">
                     {issues.length > 0 ? (
                         <div className="space-y-6">
@@ -123,7 +121,7 @@ const CrashModal = ({ isOpen, onClose, crashData, onFixApplied }) => {
                     )}
                 </div>
 
-                {/* Footer */}
+                
                 <div className="p-8 border-t border-white/5 flex gap-4">
                     <button
                         onClick={onClose}

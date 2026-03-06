@@ -43,7 +43,6 @@ public class TitleFixer {
 
         while (!p.HasExited) {
             try {
-                // Handle holen oder aktualisieren, falls Fenster neu erstellt wurde (z.B. Fullscreen Toggle)
                 if (handle == IntPtr.Zero || !IsWindow(handle)) {
                     p.Refresh();
                     handle = p.MainWindowHandle;
@@ -55,18 +54,14 @@ public class TitleFixer {
 
                     string current = sb.ToString();
                     if (current != targetTitle && !string.IsNullOrEmpty(current)) {
-                        // Minecraft detected!
                         SetWindowText(handle, targetTitle);
 
-                        // Wait a bit to avoid fighting in the same frame
                         Thread.Sleep(200);
                     }
                 }
             } catch {
-                // Fehler ignorieren
             }
 
-            // Check every 200ms when idle
             Thread.Sleep(200);
         }
     }
@@ -79,7 +74,6 @@ Add-Type -TypeDefinition $code -Language CSharp
 
         const b64 = Buffer.from(script, 'utf16le').toString('base64');
 
-        // Wichtig: windowsHide: true, damit kein Fenster aufpoppt
         exec(`powershell -ExecutionPolicy Bypass -NoProfile -EncodedCommand ${b64}`, { windowsHide: true }, (err) => {
             if (err) console.error('[Launcher] Title watcher ended:', err);
         });
@@ -123,7 +117,6 @@ Add-Type -TypeDefinition $code -Language CSharp
             "-Dmclc.profile=low-end"
         ];
 
-        // ZGC for Java 17+
         const zgcFlags = [
             "-XX:+UseZGC",
             "-XX:+ZGenerational",
@@ -168,11 +161,9 @@ Add-Type -TypeDefinition $code -Language CSharp
         return await getProcessStats(pid);
     });
     ipcMain.handle('launcher:kill', async (_, instanceName) => {
-        // If the process is already running, kill it
         const proc = childProcesses.get(instanceName);
         if (proc && !proc.killed) {
             try {
-                // On Windows, we need to kill the entire process tree
                 if (process.platform === 'win32') {
                     const { exec } = require('child_process');
                     exec(`taskkill /pid ${proc.pid} /T /F`, (err) => {
@@ -196,13 +187,11 @@ Add-Type -TypeDefinition $code -Language CSharp
 
     const launchInstance = async (instanceName, quickPlay) => {
         if (runningInstances.has(instanceName) || activeLaunches.has(instanceName)) {
-            // Check if the process is actually still alive
             const proc = childProcesses.get(instanceName);
             let isAlive = false;
 
             if (proc && proc.pid) {
                 try {
-                    // process.kill(0) is a standard way to check for process existence
                     process.kill(proc.pid, 0);
                     isAlive = true;
                 } catch (e) {
@@ -230,7 +219,6 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             const config = await fs.readJson(configPath);
 
-            // Trigger Backup on Launch
             const backupConfig = store.get('settings') || {};
             if (backupConfig.backupSettings?.enabled && backupConfig.backupSettings?.onLaunch) {
                 console.log(`[Launcher] Triggering on-launch backup for ${instanceName}`);
@@ -239,18 +227,15 @@ Add-Type -TypeDefinition $code -Language CSharp
                 });
             }
 
-            // Start Scheduler
             if (backupConfig.backupSettings?.enabled && backupConfig.backupSettings?.interval > 0) {
                 backupManager.startScheduler(instanceName, backupConfig.backupSettings.interval);
             }
 
-            // Get stored user profile for authentication
             const userProfile = store.get('user_profile');
             if (!userProfile || !userProfile.access_token) {
                 return { success: false, error: 'Not logged in. Please login first.' };
             }
 
-            // Load Settings
             const settingsPath = path.join(app.getPath('userData'), 'settings.json');
             let settings = {
                 javaPath: '',
@@ -268,7 +253,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                     console.error("Failed to load settings for launch", e);
                 }
             }
-            // Apply instance-specific overrides if they exist
             if (config.javaPath) settings.javaPath = config.javaPath;
             if (config.minMemory) settings.minMemory = config.minMemory;
             if (config.maxMemory) settings.maxMemory = config.maxMemory;
@@ -276,11 +260,9 @@ Add-Type -TypeDefinition $code -Language CSharp
             if (config.resolutionHeight) settings.resolutionHeight = config.resolutionHeight;
             if (config.javaProfile) settings.javaProfile = config.javaProfile;
 
-            // Shared Assets Directory to speed up launch and save space
             const sharedDir = path.join(app.getPath('userData'), 'common');
             await fs.ensureDir(sharedDir);
 
-            // Build launch options with REAL auth from stored profile
             let opts = {
                 clientPackage: null,
                 authorization: {
@@ -311,7 +293,6 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             console.log(`[Launcher] Launching with: version=${opts.version.number}, loader=${config.loader}`);
 
-            // Add mod loader configuration using stored versionId if it's a modded instance
             if (config.versionId && config.loader && config.loader.toLowerCase() !== 'vanilla') {
                 opts.version.custom = config.versionId;
                 console.log(`Launching with ${config.loader} custom profile: ${config.versionId}`);
@@ -319,12 +300,9 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             if (settings.javaPath && settings.javaPath.trim() !== '') {
                 let jPath = settings.javaPath;
-                // On Windows, java.exe opens a console window. javaw.exe does not.
                 if (process.platform === 'win32') {
-                    // Normalize path separators
                     jPath = path.normalize(jPath);
                     if (jPath.toLowerCase().endsWith('java.exe')) {
-                        // Try to find javaw.exe in the same directory
                         const javawPath = jPath.slice(0, -8) + 'javaw.exe';
                         if (await fs.pathExists(javawPath)) {
                             console.log(`[Launcher] Found javaw.exe, switching from java.exe to suppress console window: ${javawPath}`);
@@ -340,13 +318,12 @@ Add-Type -TypeDefinition $code -Language CSharp
             const { installJava } = require('../utils/java-utils');
 
             function getRequiredJavaVersion(mcVersion) {
-                // Simplified version parsing
                 const v = mcVersion.split('.');
                 const major = parseInt(v[0]);
                 const minor = parseInt(v[1]);
                 const patch = parseInt(v[2] || 0);
 
-                if (minor >= 21) return 21; // Actually 1.20.5+ but minor 21 is safe for future 1.21
+                if (minor >= 21) return 21;
                 if (minor === 20 && patch >= 5) return 21;
                 if (minor >= 17) return 17;
                 return 8;
@@ -363,10 +340,8 @@ Add-Type -TypeDefinition $code -Language CSharp
             const performJavaCheck = async (p) => {
                 try {
                     const { stderr, stdout } = await execAsync(`"${p}" -version`, { encoding: 'utf8' });
-                    // java -version often outputs to stderr
                     javaOutput = stderr || stdout;
 
-                    // Parse version (e.g., "1.8.0_292" or "17.0.1" or "21.0.2")
                     const versionMatch = javaOutput.match(/(?:version|jd[kj])\s*["']?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
                     if (versionMatch) {
                         let major = parseInt(versionMatch[1]);
@@ -387,13 +362,11 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             const reqVersion = getRequiredJavaVersion(config.version);
 
-            // If found but wrong version, try auto-install or find alternative
             if (javaValid && javaVersion < reqVersion) {
                 console.warn(`[Launcher] Detected Java ${javaVersion} is too old for MC ${config.version} (requires ${reqVersion}).`);
                 javaValid = false;
             }
 
-            // If invalid or missing, try auto-install
             if (!javaValid) {
                 const reqVersion = getRequiredJavaVersion(config.version);
                 console.log(`[Launcher] Java not found or invalid. Attempting auto-install of Java ${reqVersion}...`);
@@ -418,7 +391,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                     opts.javaPath = javaToCheck;
                     javaValid = await performJavaCheck(javaToCheck);
 
-                    // Also update settings so it's remembered if not overridden
                     if (!config.javaPath) {
                         try {
                             const newSettings = { ...settings, javaPath: javaToCheck };
@@ -438,7 +410,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                 };
             }
 
-            // Check for 64-bit Java with high memory
             const is64Bit = javaOutput.includes('64-Bit');
             const maxMem = parseInt(opts.memory.max) || 4096;
 
@@ -455,7 +426,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                 javaPath: opts.javaPath || 'default'
             });
 
-            // Special handling for NeoForge: It requires specific JVM arguments for Java module compatibility
             if (config.loader && config.loader.toLowerCase() === 'neoforge') {
                 const neoForgeArgs = [
                     `-DlibraryDirectory=${path.join(instanceDir, 'libraries')}`,
@@ -484,7 +454,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                 console.log("Added NeoForge JVM arguments");
             }
 
-            // Apply Java Performance Profile
             if (settings.javaProfile && settings.javaProfile !== 'default') {
                 const profileArgs = getJavaProfileArgs(settings.javaProfile, javaVersion);
                 if (profileArgs.length > 0) {
@@ -494,11 +463,9 @@ Add-Type -TypeDefinition $code -Language CSharp
                 }
             }
 
-            // Stable Window Title Tier 1: JVM Arguments
             if (!opts.customArgs) opts.customArgs = [];
             opts.customArgs.push(`-Dorg.lwjgl.opengl.Window.name=MCLC Client ${config.version || ''}`);
             opts.customArgs.push(`-Dorg.lwjgl.Display.title=MCLC Client ${config.version || ''}`);
-            // Tier 1.5: Version Type (often shown in title)
             opts.version.type = "MCLC Client";
 
             if (config.loader && config.loader.toLowerCase() !== 'vanilla') {
@@ -513,12 +480,10 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             const launcher = new Client();
 
-            // Initialize live logs buffer for this instance
             liveLogs.set(instanceName, []);
             if (config.preLaunchHook && config.preLaunchHook.trim()) {
                 try {
                     const hook = config.preLaunchHook.trim();
-                    // Basic sanity check: reject shell metacharacters to prevent command injection
                     const forbiddenChars = /[;&|`$<>]/;
                     if (forbiddenChars.test(hook)) {
                         console.error('[Launcher] Blocked potentially malicious pre-launch hook:', hook);
@@ -532,7 +497,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                 }
             }
 
-            // Emit launching status
             mainWindow.webContents.send('instance:status', {
                 instanceName,
                 status: 'launching',
@@ -541,13 +505,11 @@ Add-Type -TypeDefinition $code -Language CSharp
             });
             runningInstances.set(instanceName, Date.now());
 
-            // Update Discord RPC
             try {
                 const discord = require('./discord');
                 discord.setActivity(`Playing ${instanceName}`, 'Starting Game...', 'mclc_icon', 'MCLC', runningInstances.get(instanceName));
-            } catch (e) { /* ignore */ }
+            } catch (e) 
 
-            // Track if we've seen a crash pattern in logs
             let logCrashDetected = false;
             const crashPatterns = [
                 'Failed to start Minecraft!',
@@ -558,13 +520,9 @@ Add-Type -TypeDefinition $code -Language CSharp
                 'Exception in thread "main"'
             ];
 
-            // Discord connection tracking
-
-            // Log buffering helper
             const appendLog = (data) => {
                 const line = data.toString();
 
-                // Check for crash patterns
                 if (!logCrashDetected) {
                     for (const pattern of crashPatterns) {
                         if (line.includes(pattern)) {
@@ -575,11 +533,9 @@ Add-Type -TypeDefinition $code -Language CSharp
                     }
                 }
 
-                // Process logs line by line
                 const lines = line.split(/\r?\n/);
                 for (const l of lines) {
                     if (!l.trim()) continue;
-                    // Any future per-line processing goes here
                 }
 
                 const logs = liveLogs.get(instanceName) || [];
@@ -606,7 +562,7 @@ Add-Type -TypeDefinition $code -Language CSharp
                 try {
                     const discord = require('./discord');
                     discord.setActivity(`Playing ${instanceName}`, 'In Game', 'minecraft', 'Minecraft', runningInstances.get(instanceName));
-                } catch (e) { /* ignore */ }
+                } catch (e) 
             });
 
             launcher.on('close', async (code) => {
@@ -623,15 +579,11 @@ Add-Type -TypeDefinition $code -Language CSharp
                         currentConfig.lastPlayed = Date.now();
                         await fs.writeJson(configPath, currentConfig, { spaces: 4 });
 
-                        // Also update a separate text file as backup/easy read
                         const playtimePath = path.join(instanceDir, 'playtime.txt');
                         await fs.writeFile(playtimePath, String(currentConfig.playtime));
 
                         console.log(`[Launcher] Updated total playtime for ${instanceName}: ${currentConfig.playtime}ms`);
 
-                        // Handle Crashes & mclo.gs Upload
-                        // Handle Crashes & mclo.gs Upload
-                        // const sessionTime = Date.now() - startTime; // Use outer scope
                         const isShortSession = sessionTime < 15000;
                         const isCrash = (code !== 0 && code !== null) || logCrashDetected || isShortSession;
 
@@ -664,7 +616,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                                 }
                             }
 
-                            // Always notify frontend about the crash
                             mainWindow.webContents.send('launcher:crash-report', {
                                 instanceName,
                                 exitCode: code,
@@ -685,12 +636,10 @@ Add-Type -TypeDefinition $code -Language CSharp
                 try {
                     const discord = require('./discord');
                     discord.setActivity('In Launcher', 'Idle', 'mclc_icon', 'MCLC');
-                } catch (e) { /* ignore */ }
+                } catch (e) 
 
-                // Stop Scheduler
                 backupManager.stopScheduler(instanceName);
 
-                // Trigger Backup on Close
                 const settings = store.get('settings') || {};
                 if (settings.backupSettings?.enabled && settings.backupSettings?.onClose) {
                     console.log(`[Launcher] Triggering on-close backup for ${instanceName}`);
@@ -701,7 +650,6 @@ Add-Type -TypeDefinition $code -Language CSharp
             });
 
             try {
-                // Check cancellation before spawn
                 if (activeLaunches.get(instanceName)?.cancelled) {
                     console.log(`[Launcher] Launch aborted before spawn for ${instanceName}`);
                     activeLaunches.delete(instanceName);
@@ -711,9 +659,8 @@ Add-Type -TypeDefinition $code -Language CSharp
                     return { success: false, error: 'Launch aborted' };
                 }
 
-                activeLaunches.delete(instanceName); // active launch phase over, now running phase
+                activeLaunches.delete(instanceName);
 
-                // QuickPlay: use MCLC's native quickPlay option to auto-join a world or server
                 if (quickPlay) {
                     if (quickPlay.world) {
                         opts.quickPlay = { type: 'singleplayer', identifier: quickPlay.world };
@@ -729,7 +676,6 @@ Add-Type -TypeDefinition $code -Language CSharp
                     childProcesses.set(instanceName, proc);
                     setWindowTitle(proc.pid, `MCLC Client ${opts.version.number}`);
 
-                    // Minimal Mode: Minimize on launch (Windows only)
                     if (settings.minimalMode && process.platform === 'win32' && mainWindow) {
                         console.log('[Launcher] Minimal Mode enabled, minimizing window.');
                         mainWindow.minimize();
@@ -752,7 +698,7 @@ Add-Type -TypeDefinition $code -Language CSharp
                 try {
                     const discord = require('./discord');
                     discord.setActivity('In Launcher', 'Idle', 'minecraft', 'Minecraft');
-                } catch (err) { /* ignore */ }
+                } catch (err) 
                 return { success: false, error: e.message };
             }
 

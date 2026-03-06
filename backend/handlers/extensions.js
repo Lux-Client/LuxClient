@@ -40,7 +40,6 @@ module.exports = (ipcMain, mainWindow) => {
     const loadBackend = async (id, extensionPath) => {
         const backendPath = path.join(extensionPath, 'backend.js');
 
-        // Security: Ensure backendPath is absolute and within the extensions directory (V3)
         const resolvedBackendPath = path.resolve(backendPath);
         if (!resolvedBackendPath.startsWith(extensionsDir)) {
             console.error(`[Extensions] Blocked attempt to load backend outside extensions directory: ${resolvedBackendPath}`);
@@ -189,7 +188,6 @@ module.exports = (ipcMain, mainWindow) => {
             for (const filename of Object.keys(zip.files)) {
                 if (zip.files[filename].dir) continue;
 
-                // Security: Prevent path traversal during extraction (V8)
                 const normalizedFilename = path.normalize(filename);
                 if (normalizedFilename.startsWith('..') || path.isAbsolute(normalizedFilename)) {
                     console.warn(`[Extensions] Skipping suspicious file in ZIP: ${filename}`);
@@ -199,7 +197,6 @@ module.exports = (ipcMain, mainWindow) => {
                 const fileData = await zip.files[filename].async('nodebuffer');
                 const destPath = path.join(installPath, normalizedFilename);
 
-                // Additional check to double-ensure we stay inside installPath
                 if (!destPath.startsWith(installPath)) {
                     console.warn(`[Extensions] Blocked attempt to write outside install directory: ${destPath}`);
                     continue;

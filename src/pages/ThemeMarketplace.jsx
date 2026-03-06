@@ -6,7 +6,7 @@ const ThemeMarketplace = () => {
     const { t } = useTranslation();
     const { addNotification } = useNotification();
     const [installedThemes, setInstalledThemes] = useState([]);
-    const [activeTab, setActiveTab] = useState('online'); // Default to online for marketplace
+    const [activeTab, setActiveTab] = useState('online');
     const [onlineThemes, setOnlineThemes] = useState([]);
     const [loadingOnline, setLoadingOnline] = useState(false);
     const [installing, setInstalling] = useState(null);
@@ -33,7 +33,6 @@ const ThemeMarketplace = () => {
             const response = await fetch('https://mclc.pluginhub.de/api/extensions?type=theme');
             if (response.ok) {
                 const data = await response.json();
-                // Client-side filtering as fallback in case the API doesn't support `type=theme` yet
                 const themesOnly = data.filter(ext => ext.type === 'theme');
                 setOnlineThemes(themesOnly);
             } else {
@@ -73,7 +72,6 @@ const ThemeMarketplace = () => {
                         method: 'POST'
                     });
                 } catch (e) {
-                    // Ignore tracking errors
                 }
 
                 addNotification(t('styling.imported_success', 'Theme installed successfully!'), 'success');

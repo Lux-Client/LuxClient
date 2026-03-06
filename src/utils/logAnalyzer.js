@@ -1,7 +1,4 @@
-/**
- * Smart Log Analyzer for Minecraft Crashes
- * Identifies common crash patterns and suggests "One-Click Fixes".
- */
+
 
 const CRASH_PATTERNS = [
     {
@@ -96,7 +93,6 @@ export function analyzeLog(logContent) {
         }
     }
 
-    // Sort by priority (highest first)
     return issues.sort((a, b) => b.priority - a.priority);
 }
 

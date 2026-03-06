@@ -167,7 +167,6 @@ function Settings({ mode = 'default' }) {
                     ...(res.settings.cloudBackupSettings || {})
                 }
             };
-            // Map old language codes
             const languageMap = { 'en': 'en_us', 'de': 'de_de' };
             if (languageMap[loadedSettings.language]) {
                 loadedSettings.language = languageMap[loadedSettings.language];
@@ -919,7 +918,7 @@ function Settings({ mode = 'default' }) {
                     </div>
                 )}
 
-                {/* Compatibility Section */}
+                
                 <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                     <h2 className="text-lg font-bold mb-6 text-white">{t('settings.compatibility.title', 'Compatibility')}</h2>
 
@@ -1031,7 +1030,7 @@ function Settings({ mode = 'default' }) {
                     </div>
                 </div>
 
-                {/* Update Section */}
+                
                 <div className="bg-surface/50 p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                     <h2 className="text-lg font-bold mb-6 text-white flex items-center gap-2">
                         <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
