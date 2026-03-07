@@ -76,7 +76,7 @@ interface ElectronAPI {
   installMod: (data: any) => Promise<any>;
   modrinthInstall: (data: any) => Promise<any>;
   installLocalMod: (instanceName: string, filePath: string, type?: string) => Promise<any>;
-  getModVersions: (projectId: string, loaders?: any, gameVersions?: any) => Promise<any>;
+  getModVersions: (projectId: string, loaders?: any, gameVersions?: any, fallbackCurseForgeProjectId?: string | null) => Promise<any>;
   getModrinthProject: (projectId: string) => Promise<any>;
   resolveDependencies: (versionId: string, loaders?: any, gameVersions?: any) => Promise<any>;
   checkUpdates: (instanceName: string, files?: any) => Promise<any>;

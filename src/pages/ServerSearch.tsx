@@ -3,6 +3,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { Analytics } from '../services/Analytics';
 import ModDependencyModal from '../components/ModDependencyModal';
+import { getSourceTags } from '../utils/sourceTags';
 
 function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any; onCategoryConsumed?: any }) {
     const { t } = useTranslation();
@@ -110,7 +111,8 @@ function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any
                 offset,
                 limit,
                 index: sortMethod,
-                projectType: projectType
+                projectType: projectType,
+                includeCurseforge: projectType === 'mod' || projectType === 'plugin'
             });
 
             if (res.success) {
@@ -183,7 +185,12 @@ function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any
                 ? []
                 : [server.loader];
 
-            const res = await window.electronAPI.getModVersions(selectedMod.project_id, loaders, [server.version]);
+            const res = await window.electronAPI.getModVersions(
+                selectedMod.project_id,
+                loaders,
+                [server.version],
+                selectedMod.curseforge_project_id || null
+            );
 
             if (res.success && res.versions.length > 0) {
                 const version = res.versions[0];
@@ -197,14 +204,16 @@ function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any
                 } else {
 
                     const file = version.files.find(f => f.primary) || version.files[0];
+                    const installProjectId = version.project_id || selectedMod.project_id;
                     await executeInstallList([{
                         instanceName: selectedServer,
-                        projectId: selectedMod.project_id,
+                        projectId: installProjectId,
                         versionId: version.id,
                         filename: file.filename,
                         url: file.url,
                         projectType: selectedMod.project_type,
                         title: selectedMod.title,
+                        fallbackCurseForgeProjectId: selectedMod.curseforge_project_id || null,
                         isServer: true
                     }]);
                 }
@@ -230,6 +239,7 @@ function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any
                 const res = await window.electronAPI.modrinthInstall({
                     instanceName: item.instanceName,
                     projectId: item.projectId,
+                    fallbackCurseForgeProjectId: item.fallbackCurseForgeProjectId || null,
                     versionId: item.versionId,
                     filename: item.filename,
                     url: item.url,
@@ -344,6 +354,9 @@ function Search({ initialCategory, onCategoryConsumed }: { initialCategory?: any
                                         <p className="text-xs text-muted-foreground mt-1">{mod.author}</p>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             <span className="text-[10px] bg-muted px-2 py-1 rounded text-muted-foreground capitalize border border-border">{projectType}</span>
+                                            {getSourceTags(mod.source, mod.sources).map((sourceTag) => (
+                                                <span key={`${mod.project_id}-${sourceTag}`} className="text-[10px] bg-muted px-2 py-1 rounded text-muted-foreground uppercase border border-border">{sourceTag}</span>
+                                            ))}
                                             <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20 flex items-center gap-1">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" transform="rotate(180 10 10)" /></svg>
                                                 {formatDownloads(mod.downloads)}

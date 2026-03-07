@@ -4,9 +4,830 @@ const path = require('path');
 const { app } = require('electron');
 
 const MODRINTH_API = 'https://api.modrinth.com/v2';
+const CURSEFORGE_API = 'https://api.curse.tools/v1/cf';
+const CURSEFORGE_PROJECT_PREFIX = 'curseforge:';
+const CURSEFORGE_VERSION_PREFIX = 'cf-file:';
+const MODRINTH_PROJECT_PREFIX = 'modrinth:';
 const USER_AGENT = 'MCLCAGENT/MinecraftLauncher/1.0 (fernsehheft@pluginhub.de)';
 const appData = app.getPath('userData');
 const instancesDir = path.join(appData, 'instances');
+const modrinthToCurseForgeProjectMap = new Map();
+
+const CURSEFORGE_CLASS_BY_PROJECT_TYPE = {
+    mod: 6,
+    plugin: 5,
+    resourcepack: 12,
+    modpack: 4471,
+    shader: 6
+};
+
+const CURSEFORGE_KNOWN_LOADERS = new Set([
+    'forge',
+    'neoforge',
+    'fabric',
+    'quilt',
+    'paper',
+    'spigot',
+    'bukkit',
+    'purpur',
+    'folia',
+    'velocity',
+    'waterfall',
+    'bungeecord'
+]);
+
+const CURSEFORGE_LOADER_ALIASES = {
+    forge: ['forge'],
+    neoforge: ['neoforge', 'neo forge'],
+    fabric: ['fabric'],
+    quilt: ['quilt'],
+    paper: ['paper', 'spigot', 'bukkit', 'purpur', 'folia'],
+    spigot: ['spigot', 'paper', 'bukkit', 'purpur', 'folia'],
+    bukkit: ['bukkit', 'paper', 'spigot', 'purpur', 'folia'],
+    purpur: ['purpur', 'paper', 'spigot', 'bukkit', 'folia'],
+    folia: ['folia', 'paper', 'spigot', 'bukkit', 'purpur'],
+    velocity: ['velocity'],
+    waterfall: ['waterfall'],
+    bungeecord: ['bungeecord'],
+    vanilla: []
+};
+
+const normalizeProjectType = (projectType) => {
+    if (projectType === 'shaderpack') return 'shader';
+    if (projectType === 'resource_pack') return 'resourcepack';
+    return projectType || 'mod';
+};
+
+const normalizeModrinthProjectId = (projectId) => {
+    if (typeof projectId !== 'string') return projectId;
+    if (projectId.startsWith(MODRINTH_PROJECT_PREFIX)) {
+        return projectId.slice(MODRINTH_PROJECT_PREFIX.length);
+    }
+    return projectId;
+};
+
+const mapCurseForgeClassToProjectType = (classId) => {
+    if (classId === 5) return 'plugin';
+    if (classId === 12) return 'resourcepack';
+    if (classId === 4471) return 'modpack';
+    return 'mod';
+};
+
+const getCurseForgeClassId = (projectType) => {
+    const normalized = normalizeProjectType(projectType);
+    return CURSEFORGE_CLASS_BY_PROJECT_TYPE[normalized] || CURSEFORGE_CLASS_BY_PROJECT_TYPE.mod;
+};
+
+const toCurseForgeProjectId = (projectId) => `${CURSEFORGE_PROJECT_PREFIX}${projectId}`;
+
+const isCurseForgeProjectId = (projectId) => {
+    if (typeof projectId !== 'string') return false;
+    return projectId.startsWith(CURSEFORGE_PROJECT_PREFIX);
+};
+
+const parseCurseForgeProjectId = (projectId) => {
+    if (typeof projectId === 'number') return projectId;
+    if (typeof projectId !== 'string') return NaN;
+    const normalized = isCurseForgeProjectId(projectId)
+        ? projectId.slice(CURSEFORGE_PROJECT_PREFIX.length)
+        : projectId;
+    return Number.parseInt(normalized, 10);
+};
+
+const normalizeCurseForgeProjectId = (projectId) => {
+    if (typeof projectId === 'number' && Number.isFinite(projectId)) {
+        return toCurseForgeProjectId(projectId);
+    }
+
+    if (typeof projectId !== 'string') return '';
+    const normalized = projectId.trim();
+    if (!normalized) return '';
+
+    if (isCurseForgeProjectId(normalized)) {
+        return normalized;
+    }
+
+    if (/^\d+$/.test(normalized)) {
+        return toCurseForgeProjectId(normalized);
+    }
+
+    return '';
+};
+
+const toCurseForgeVersionId = (fileId) => `${CURSEFORGE_VERSION_PREFIX}${fileId}`;
+
+const isCurseForgeVersionId = (versionId) => {
+    if (typeof versionId !== 'string') return false;
+    return versionId.startsWith(CURSEFORGE_VERSION_PREFIX);
+};
+
+const parseCurseForgeVersionId = (versionId) => {
+    if (typeof versionId === 'number') return versionId;
+    if (typeof versionId !== 'string') return NaN;
+
+    if (isCurseForgeVersionId(versionId)) {
+        return Number.parseInt(versionId.slice(CURSEFORGE_VERSION_PREFIX.length), 10);
+    }
+
+    if (/^\d+$/.test(versionId)) {
+        return Number.parseInt(versionId, 10);
+    }
+
+    return NaN;
+};
+
+const sortByDateDesc = (left, right, key) => {
+    const leftTime = new Date(left?.[key] || 0).getTime();
+    const rightTime = new Date(right?.[key] || 0).getTime();
+    return rightTime - leftTime;
+};
+
+const sortByDateAsc = (left, right, key) => {
+    const leftTime = new Date(left?.[key] || 0).getTime();
+    const rightTime = new Date(right?.[key] || 0).getTime();
+    return leftTime - rightTime;
+};
+
+const getSearchDateValue = (entry, keys = []) => {
+    for (const key of keys) {
+        const value = entry?.[key];
+        if (!value) continue;
+        const parsed = new Date(value).getTime();
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+
+    return 0;
+};
+
+const getNormalizedSearchIndex = (index) => {
+    const normalized = String(index || 'downloads').toLowerCase();
+    if (normalized === 'relevance') return 'downloads';
+    return normalized;
+};
+
+const normalizeSearchText = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const getSearchEntryTitle = (entry) => entry?.title || entry?.name || '';
+
+const getSearchEntrySummary = (entry) => entry?.description || entry?.summary || '';
+
+const getSearchEntryAuthor = (entry) => entry?.author || '';
+
+const getSearchEntryId = (entry) => String(entry?.project_id || entry?.id || '');
+
+const getSearchEntryIcon = (entry) => {
+    const icon = entry?.icon_url || entry?.icon || null;
+    if (typeof icon !== 'string') return icon;
+    const normalized = icon.trim();
+    return normalized || null;
+};
+
+const resolveCurseForgeProjectIdFromSearchEntry = (entry) => {
+    const sourceCandidates = normalizeSources(entry?.sources || entry?.__sourceSet || entry?.source);
+    const candidates = [entry?.curseforge_project_id, entry?.project_id, entry?.id];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeCurseForgeProjectId(candidate);
+        if (normalized) {
+            return normalized;
+        }
+
+        if (typeof candidate === 'string' && /^\d+$/.test(candidate) && sourceCandidates.includes('curseforge')) {
+            return toCurseForgeProjectId(candidate);
+        }
+    }
+
+    return '';
+};
+
+const resolveModrinthProjectIdFromSearchEntry = (entry) => {
+    const candidates = [entry?.modrinth_project_id, entry?.project_id, entry?.id];
+
+    for (const candidate of candidates) {
+        if (candidate === undefined || candidate === null) continue;
+        const normalized = normalizeModrinthProjectId(String(candidate).trim());
+        if (!normalized) continue;
+        if (isCurseForgeProjectId(normalized)) continue;
+        if (/^\d+$/.test(normalized)) continue;
+        return normalized;
+    }
+
+    return '';
+};
+
+const compareSearchEntriesStable = (leftEntry, rightEntry) => {
+    const leftTitle = normalizeSearchText(getSearchEntryTitle(leftEntry));
+    const rightTitle = normalizeSearchText(getSearchEntryTitle(rightEntry));
+    if (leftTitle !== rightTitle) {
+        return leftTitle < rightTitle ? -1 : 1;
+    }
+
+    const leftSummary = normalizeSearchText(getSearchEntrySummary(leftEntry));
+    const rightSummary = normalizeSearchText(getSearchEntrySummary(rightEntry));
+    if (leftSummary !== rightSummary) {
+        return leftSummary < rightSummary ? -1 : 1;
+    }
+
+    const leftId = getSearchEntryId(leftEntry);
+    const rightId = getSearchEntryId(rightEntry);
+    if (leftId !== rightId) {
+        return leftId < rightId ? -1 : 1;
+    }
+
+    return 0;
+};
+
+const normalizeSources = (sourceValue) => {
+    if (sourceValue instanceof Set) {
+        return normalizeSources([...sourceValue]);
+    }
+
+    if (Array.isArray(sourceValue)) {
+        return sourceValue
+            .map((entry) => String(entry || '').toLowerCase().trim())
+            .filter(Boolean);
+    }
+
+    if (typeof sourceValue === 'string') {
+        const normalized = sourceValue.toLowerCase();
+        return ['modrinth', 'curseforge'].filter((source) => normalized.includes(source));
+    }
+
+    return [];
+};
+
+const createMergeCandidateKeys = (entry) => {
+    const projectType = normalizeProjectType(entry?.project_type || 'mod');
+    const title = normalizeSearchText(getSearchEntryTitle(entry));
+    const summary = normalizeSearchText(getSearchEntrySummary(entry));
+    const author = normalizeSearchText(getSearchEntryAuthor(entry));
+    const slug = normalizeSearchText(entry?.slug || '');
+    const keys = [];
+
+    if (title && author) {
+        keys.push(`${projectType}::title-author::${title}::${author}`);
+    }
+
+    if (slug) {
+        keys.push(`${projectType}::slug::${slug}`);
+    }
+
+    if (title && summary) {
+        keys.push(`${projectType}::title-summary::${title}::${summary}`);
+    }
+
+    if (title) {
+        keys.push(`${projectType}::title::${title}`);
+    }
+
+    const fallbackId = String(entry?.project_id || entry?.id || '');
+    if (fallbackId) {
+        keys.push(`${projectType}::id::${fallbackId}`);
+    }
+
+    if (keys.length === 0) {
+        keys.push(`${projectType}::rank::${Number(entry?.__providerRank ?? Number.MAX_SAFE_INTEGER)}`);
+    }
+
+    return [...new Set(keys)];
+};
+
+const createMergeKey = (entry) => {
+    const candidateKeys = createMergeCandidateKeys(entry);
+    if (candidateKeys.length > 0) {
+        return candidateKeys[0];
+    }
+
+    const projectType = normalizeProjectType(entry?.project_type || 'mod');
+    return `${projectType}::id::${String(entry?.project_id || entry?.id || '')}`;
+};
+
+const pickPreferredPrimaryEntry = (currentEntry, incomingEntry) => {
+    const currentSources = normalizeSources(currentEntry?.sources || currentEntry?.__sourceSet || currentEntry?.source);
+    const incomingSources = normalizeSources(incomingEntry?.sources || incomingEntry?.__sourceSet || incomingEntry?.source);
+
+    const currentHasModrinth = currentSources.includes('modrinth');
+    const incomingHasModrinth = incomingSources.includes('modrinth');
+
+    if (incomingHasModrinth && !currentHasModrinth) {
+        return incomingEntry;
+    }
+
+    if (currentHasModrinth && !incomingHasModrinth) {
+        return currentEntry;
+    }
+
+    const currentDownloads = Number(currentEntry?.downloads || 0);
+    const incomingDownloads = Number(incomingEntry?.downloads || 0);
+    if (incomingDownloads > currentDownloads) {
+        return incomingEntry;
+    }
+
+    return currentEntry;
+};
+
+const mergeDuplicateSearchEntries = (entries = []) => {
+    const mergedByKey = new Map();
+
+    for (const entry of entries) {
+        const candidateKeys = createMergeCandidateKeys(entry);
+        const mergeKey = candidateKeys.find((key) => mergedByKey.has(key)) || createMergeKey(entry);
+        const existing = mergedByKey.get(mergeKey);
+
+        if (!existing) {
+            const modrinthProjectId = resolveModrinthProjectIdFromSearchEntry(entry);
+            const curseforgeProjectId = resolveCurseForgeProjectIdFromSearchEntry(entry);
+            const initialEntry = {
+                ...entry,
+                icon_url: getSearchEntryIcon(entry),
+                modrinth_project_id: modrinthProjectId || undefined,
+                curseforge_project_id: curseforgeProjectId || undefined,
+                __sourceSet: new Set(normalizeSources(entry?.sources || entry?.__sourceSet || entry?.source)),
+                __providerRank: Number(entry?.__providerRank ?? Number.MAX_SAFE_INTEGER)
+            };
+
+            for (const key of (candidateKeys.length > 0 ? candidateKeys : [mergeKey])) {
+                mergedByKey.set(key, initialEntry);
+            }
+            continue;
+        }
+
+        const preferred = pickPreferredPrimaryEntry(existing, entry);
+        const retained = preferred === existing ? entry : existing;
+
+        const combinedSourceSet = new Set([
+            ...normalizeSources(existing?.sources || existing?.__sourceSet || existing?.source),
+            ...normalizeSources(entry?.sources || entry?.__sourceSet || entry?.source)
+        ]);
+
+        const mergedModrinthProjectId =
+            resolveModrinthProjectIdFromSearchEntry(preferred) ||
+            resolveModrinthProjectIdFromSearchEntry(retained) ||
+            resolveModrinthProjectIdFromSearchEntry(existing) ||
+            resolveModrinthProjectIdFromSearchEntry(entry);
+
+        const mergedCurseForgeProjectId =
+            resolveCurseForgeProjectIdFromSearchEntry(preferred) ||
+            resolveCurseForgeProjectIdFromSearchEntry(retained) ||
+            resolveCurseForgeProjectIdFromSearchEntry(existing) ||
+            resolveCurseForgeProjectIdFromSearchEntry(entry);
+
+        const mergedEntry = {
+            ...preferred,
+            downloads: Number(existing?.downloads || 0) + Number(entry?.downloads || 0),
+            follows: Math.max(Number(existing?.follows || 0), Number(entry?.follows || 0)),
+            icon_url: getSearchEntryIcon(preferred)
+                || getSearchEntryIcon(retained)
+                || getSearchEntryIcon(existing)
+                || getSearchEntryIcon(entry)
+                || null,
+            date_created: (() => {
+                const preferredValue = getSearchDateValue(preferred, ['date_created']);
+                const retainedValue = getSearchDateValue(retained, ['date_created']);
+                if (preferredValue > 0 && retainedValue > 0) {
+                    return preferredValue <= retainedValue ? preferred.date_created : retained.date_created;
+                }
+                return preferred.date_created || retained.date_created;
+            })(),
+            date_modified: (() => {
+                const preferredValue = getSearchDateValue(preferred, ['date_modified']);
+                const retainedValue = getSearchDateValue(retained, ['date_modified']);
+                if (preferredValue > 0 && retainedValue > 0) {
+                    return preferredValue >= retainedValue ? preferred.date_modified : retained.date_modified;
+                }
+                return preferred.date_modified || retained.date_modified;
+            })(),
+            __providerRank: Math.min(
+                Number(existing?.__providerRank ?? Number.MAX_SAFE_INTEGER),
+                Number(entry?.__providerRank ?? Number.MAX_SAFE_INTEGER)
+            ),
+            modrinth_project_id: mergedModrinthProjectId || undefined,
+            curseforge_project_id: mergedCurseForgeProjectId || undefined,
+            __sourceSet: combinedSourceSet
+        };
+
+        const mergedKeys = [
+            ...createMergeCandidateKeys(existing),
+            ...candidateKeys,
+            ...createMergeCandidateKeys(mergedEntry)
+        ];
+
+        for (const key of mergedKeys) {
+            mergedByKey.set(key, mergedEntry);
+        }
+    }
+
+    const uniqueMergedEntries = [...new Set(mergedByKey.values())];
+
+    return uniqueMergedEntries.map((entry) => {
+        const sourceList = [...(entry.__sourceSet || new Set())];
+        const prioritizedSources = ['modrinth', 'curseforge'].filter((source) => sourceList.includes(source));
+        const customSources = sourceList.filter((source) => !prioritizedSources.includes(source));
+        const sources = [...prioritizedSources, ...customSources];
+        const source = sources.length > 0 ? sources.join(' + ') : 'modrinth';
+        const modrinthProjectId = resolveModrinthProjectIdFromSearchEntry(entry);
+        const curseforgeProjectId = resolveCurseForgeProjectIdFromSearchEntry(entry);
+
+        if (modrinthProjectId && curseforgeProjectId) {
+            modrinthToCurseForgeProjectMap.set(modrinthProjectId, curseforgeProjectId);
+        }
+
+        return {
+            ...entry,
+            icon_url: getSearchEntryIcon(entry),
+            source,
+            sources,
+            modrinth_project_id: modrinthProjectId || undefined,
+            curseforge_project_id: curseforgeProjectId || undefined,
+            __sourceSet: sources
+        };
+    });
+};
+
+const sortMergedSearchResults = (results, index) => {
+    const normalizedIndex = getNormalizedSearchIndex(index);
+    const sorted = [...results];
+
+    if (normalizedIndex === 'downloads') {
+        sorted.sort((left, right) => {
+            const downloadsDiff = Number(right?.downloads || 0) - Number(left?.downloads || 0);
+            if (downloadsDiff !== 0) return downloadsDiff;
+
+            const followsDiff = Number(right?.follows || 0) - Number(left?.follows || 0);
+            if (followsDiff !== 0) return followsDiff;
+
+            const updatedDiff = getSearchDateValue(right, ['date_modified', 'date_created']) - getSearchDateValue(left, ['date_modified', 'date_created']);
+            if (updatedDiff !== 0) return updatedDiff;
+
+            return compareSearchEntriesStable(left, right);
+        });
+        return sorted;
+    }
+
+    if (normalizedIndex === 'newest') {
+        sorted.sort((left, right) => {
+            const createdDiff = getSearchDateValue(right, ['date_created', 'date_modified']) - getSearchDateValue(left, ['date_created', 'date_modified']);
+            if (createdDiff !== 0) return createdDiff;
+
+            const downloadsDiff = Number(right?.downloads || 0) - Number(left?.downloads || 0);
+            if (downloadsDiff !== 0) return downloadsDiff;
+
+            return compareSearchEntriesStable(left, right);
+        });
+        return sorted;
+    }
+
+    if (normalizedIndex === 'oldest') {
+        sorted.sort((left, right) => {
+            const createdDiff = getSearchDateValue(left, ['date_created', 'date_modified']) - getSearchDateValue(right, ['date_created', 'date_modified']);
+            if (createdDiff !== 0) return createdDiff;
+
+            const downloadsDiff = Number(right?.downloads || 0) - Number(left?.downloads || 0);
+            if (downloadsDiff !== 0) return downloadsDiff;
+
+            return compareSearchEntriesStable(left, right);
+        });
+        return sorted;
+    }
+
+    if (normalizedIndex === 'updated') {
+        sorted.sort((left, right) => {
+            const updatedDiff = getSearchDateValue(right, ['date_modified', 'date_created']) - getSearchDateValue(left, ['date_modified', 'date_created']);
+            if (updatedDiff !== 0) return updatedDiff;
+
+            const downloadsDiff = Number(right?.downloads || 0) - Number(left?.downloads || 0);
+            if (downloadsDiff !== 0) return downloadsDiff;
+
+            return compareSearchEntriesStable(left, right);
+        });
+        return sorted;
+    }
+
+    sorted.sort((left, right) => {
+        const downloadsDiff = Number(right?.downloads || 0) - Number(left?.downloads || 0);
+        if (downloadsDiff !== 0) return downloadsDiff;
+
+        const followsDiff = Number(right?.follows || 0) - Number(left?.follows || 0);
+        if (followsDiff !== 0) return followsDiff;
+
+        const updatedDiff = getSearchDateValue(right, ['date_modified', 'date_created']) - getSearchDateValue(left, ['date_modified', 'date_created']);
+        if (updatedDiff !== 0) return updatedDiff;
+
+        return compareSearchEntriesStable(left, right);
+    });
+
+    return sorted;
+};
+
+const stripSearchInternalFields = (entry) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    const { __providerRank, __sourceSet, ...cleanEntry } = entry;
+    return cleanEntry;
+};
+
+const mapCurseForgeReleaseType = (releaseType) => {
+    if (releaseType === 1) return 'release';
+    if (releaseType === 2) return 'beta';
+    if (releaseType === 3) return 'alpha';
+    return 'release';
+};
+
+const extractCurseForgeGameVersions = (file) => {
+    const list = Array.isArray(file?.gameVersions) ? file.gameVersions : [];
+    return list.filter((entry) => /^\d+\.\d+(\.\d+)?$/.test(String(entry || '').trim()));
+};
+
+const extractCurseForgeLoaders = (file) => {
+    const list = Array.isArray(file?.gameVersions) ? file.gameVersions : [];
+    return list
+        .map(entry => String(entry || '').toLowerCase())
+        .filter(entry => CURSEFORGE_KNOWN_LOADERS.has(entry));
+};
+
+const getCurseForgeLoaderAliases = (loader) => {
+    const normalized = String(loader || '').toLowerCase();
+    return CURSEFORGE_LOADER_ALIASES[normalized] || [normalized];
+};
+
+const isCurseForgeLoaderCompatible = (file, loaders = []) => {
+    if (!Array.isArray(loaders) || loaders.length === 0) {
+        return true;
+    }
+
+    const versionEntries = Array.isArray(file?.gameVersions)
+        ? file.gameVersions.map(entry => String(entry || '').toLowerCase())
+        : [];
+
+    const normalizedLoaders = loaders
+        .map(loader => String(loader || '').toLowerCase())
+        .filter(loader => loader && loader !== 'vanilla');
+
+    if (normalizedLoaders.length === 0) {
+        return true;
+    }
+
+    return normalizedLoaders.some(loader => {
+        const aliases = getCurseForgeLoaderAliases(loader);
+        return aliases.some(alias => versionEntries.includes(alias));
+    });
+};
+
+const isCurseForgeGameVersionCompatible = (file, gameVersions = []) => {
+    if (!Array.isArray(gameVersions) || gameVersions.length === 0) {
+        return true;
+    }
+
+    const versionEntries = Array.isArray(file?.gameVersions)
+        ? file.gameVersions.map(entry => String(entry || '').toLowerCase())
+        : [];
+
+    const normalizedVersions = gameVersions
+        .map(version => String(version || '').toLowerCase())
+        .filter(Boolean);
+
+    if (normalizedVersions.length === 0) {
+        return true;
+    }
+
+    return normalizedVersions.some(version => versionEntries.includes(version));
+};
+
+const mapCurseForgeModToSearchHit = (mod, projectType) => ({
+    project_id: toCurseForgeProjectId(mod.id),
+    project_type: normalizeProjectType(projectType || mapCurseForgeClassToProjectType(mod.classId)),
+    title: mod.name,
+    description: mod.summary || '',
+    author: Array.isArray(mod.authors) && mod.authors.length > 0 ? mod.authors[0].name : 'Unknown',
+    icon_url: mod.logo?.thumbnailUrl || mod.logo?.url || null,
+    downloads: Number(mod.downloadCount || 0),
+    follows: Number(mod.thumbsUpCount || 0),
+    slug: mod.slug,
+    source: 'curseforge',
+    date_modified: mod.dateModified,
+    date_created: mod.dateCreated
+});
+
+const mapCurseForgeFileToVersion = (file, projectId) => {
+    const primaryUrl = file?.downloadUrl || '';
+    const normalizedProjectId = normalizeCurseForgeProjectId(projectId);
+    return {
+        id: toCurseForgeVersionId(file.id),
+        project_id: normalizedProjectId || undefined,
+        source: 'curseforge',
+        version_number: file.displayName || file.fileName || String(file.id),
+        version_type: mapCurseForgeReleaseType(file.releaseType),
+        date_published: file.fileDate,
+        game_versions: extractCurseForgeGameVersions(file),
+        loaders: extractCurseForgeLoaders(file),
+        files: [
+            {
+                filename: file.fileName || `${file.id}.jar`,
+                url: primaryUrl,
+                primary: true,
+                size: Number(file.fileLength || 0)
+            }
+        ]
+    };
+};
+
+const getCurseForgeCompatibleVersions = async (projectId, loaders = [], gameVersions = []) => {
+    const normalizedProjectId = normalizeCurseForgeProjectId(projectId);
+    if (!normalizedProjectId) {
+        return [];
+    }
+
+    const files = await getCurseForgeFiles(normalizedProjectId, 100);
+    return files
+        .filter(file => isCurseForgeLoaderCompatible(file, loaders))
+        .filter(file => isCurseForgeGameVersionCompatible(file, gameVersions))
+        .sort((left, right) => sortByDateDesc(left, right, 'fileDate'))
+        .map(file => mapCurseForgeFileToVersion(file, normalizedProjectId));
+};
+
+const getCurseForgeProject = async (projectId) => {
+    const numericProjectId = parseCurseForgeProjectId(projectId);
+    if (!Number.isFinite(numericProjectId)) {
+        throw new Error('Invalid CurseForge project ID');
+    }
+
+    const response = await axios.get(`${CURSEFORGE_API}/mods/${numericProjectId}`, {
+        headers: { 'User-Agent': USER_AGENT },
+        timeout: 10000
+    });
+
+    return response?.data?.data;
+};
+
+const getCurseForgeFiles = async (projectId, pageSize = 50) => {
+    const numericProjectId = parseCurseForgeProjectId(projectId);
+    if (!Number.isFinite(numericProjectId)) {
+        throw new Error('Invalid CurseForge project ID');
+    }
+
+    const response = await axios.get(`${CURSEFORGE_API}/mods/${numericProjectId}/files`, {
+        params: { pageSize, index: 0 },
+        headers: { 'User-Agent': USER_AGENT },
+        timeout: 10000
+    });
+
+    return Array.isArray(response?.data?.data) ? response.data.data : [];
+};
+
+const getCurseForgeFile = async (projectId, versionId) => {
+    const numericProjectId = parseCurseForgeProjectId(projectId);
+    const numericVersionId = parseCurseForgeVersionId(versionId);
+
+    if (!Number.isFinite(numericProjectId) || !Number.isFinite(numericVersionId)) {
+        throw new Error('Invalid CurseForge project or version ID');
+    }
+
+    const response = await axios.get(`${CURSEFORGE_API}/mods/${numericProjectId}/files/${numericVersionId}`, {
+        headers: { 'User-Agent': USER_AGENT },
+        timeout: 10000
+    });
+
+    return response?.data?.data;
+};
+
+const searchCurseForge = async ({ query, projectType, limit = 20, offset = 0, index = 'downloads' }) => {
+    const classId = getCurseForgeClassId(projectType);
+    const normalizedLimit = Math.max(1, Number(limit) || 20);
+    const normalizedOffset = Math.max(0, Number(offset) || 0);
+    const normalizedIndex = getNormalizedSearchIndex(index);
+    const maxPageSize = 50;
+
+    let sortField;
+    let sortOrder;
+    if (normalizedIndex === 'downloads') {
+        sortField = 6;
+        sortOrder = 'desc';
+    } else if (normalizedIndex === 'newest' || normalizedIndex === 'updated') {
+        sortField = 3;
+        sortOrder = 'desc';
+    } else if (normalizedIndex === 'oldest') {
+        sortField = 3;
+        sortOrder = 'asc';
+    }
+
+    const mapped = [];
+    let totalHits = 0;
+    let remaining = normalizedLimit;
+    let currentOffset = normalizedOffset;
+    let requestCount = 0;
+
+    while (remaining > 0 && requestCount < 5) {
+        requestCount += 1;
+
+        const params = {
+            gameId: 432,
+            classId,
+            searchFilter: query || '',
+            pageSize: Math.min(maxPageSize, remaining),
+            index: currentOffset
+        };
+
+        if (sortField !== undefined) params.sortField = sortField;
+        if (sortOrder !== undefined) params.sortOrder = sortOrder;
+
+        const response = await axios.get(`${CURSEFORGE_API}/mods/search`, {
+            params,
+            headers: { 'User-Agent': USER_AGENT },
+            timeout: 10000
+        });
+
+        const mods = Array.isArray(response?.data?.data) ? response.data.data : [];
+        const resultCount = Number(response?.data?.pagination?.resultCount || mods.length);
+        totalHits = Number(response?.data?.pagination?.totalCount || totalHits || mods.length);
+
+        mapped.push(...mods.map(mod => mapCurseForgeModToSearchHit(mod, projectType)));
+
+        if (resultCount <= 0) break;
+
+        currentOffset += resultCount;
+        remaining -= resultCount;
+
+        if (totalHits > 0 && currentOffset >= totalHits) {
+            break;
+        }
+    }
+
+    if (normalizedIndex === 'downloads') {
+        mapped.sort((left, right) => Number(right?.downloads || 0) - Number(left?.downloads || 0));
+    } else if (normalizedIndex === 'newest') {
+        mapped.sort((left, right) => sortByDateDesc(left, right, 'date_created'));
+    } else if (normalizedIndex === 'oldest') {
+        mapped.sort((left, right) => sortByDateAsc(left, right, 'date_created'));
+    } else if (normalizedIndex === 'updated') {
+        mapped.sort((left, right) => sortByDateDesc(left, right, 'date_modified'));
+    }
+
+    return {
+        results: mapped,
+        total_hits: Number(totalHits || mapped.length),
+        offset: normalizedOffset,
+        limit: normalizedLimit
+    };
+};
+
+const resolveInstallContext = async (data) => {
+    let loader = 'vanilla';
+    let version = '';
+
+    if (data.isServer) {
+        const serversDir = path.join(appData, 'servers');
+        const resolvedSafeName = await resolveServerSafeName(data.instanceName, data.serverSafeName);
+        const serverJsonPath = path.join(serversDir, resolvedSafeName, 'server.json');
+        if (await fs.pathExists(serverJsonPath)) {
+            const serverConfig = await fs.readJson(serverJsonPath);
+            loader = serverConfig.software ? serverConfig.software.toLowerCase() : 'vanilla';
+            version = serverConfig.version;
+        }
+    } else {
+        const instanceJsonPath = path.join(instancesDir, data.instanceName, 'instance.json');
+        if (await fs.pathExists(instanceJsonPath)) {
+            const instance = await fs.readJson(instanceJsonPath);
+            loader = instance.loader ? instance.loader.toLowerCase() : 'vanilla';
+            version = instance.version;
+        }
+    }
+
+    return { loader, version };
+};
+
+const updateModCacheForInstall = async ({ destination, projectId, versionId, source, title, icon, version }) => {
+    try {
+        if (!destination || !await fs.pathExists(destination)) return;
+
+        const stats = await fs.stat(destination);
+        const cacheKey = `${path.basename(destination)}-${stats.size}`;
+        const cachePath = path.join(appData, 'mod_cache.json');
+        let cache = {};
+
+        if (await fs.pathExists(cachePath)) {
+            cache = await fs.readJson(cachePath).catch(() => ({}));
+        }
+
+        cache[cacheKey] = {
+            title: title || path.basename(destination),
+            icon: icon || null,
+            version: version || null,
+            projectId,
+            versionId,
+            source,
+            timestamp: Date.now()
+        };
+
+        await fs.writeJson(cachePath, cache);
+    } catch (e) {
+        console.warn('[Install:Cache] Failed to update mod cache:', e.message);
+    }
+};
 
 const getFolderForProjectType = (projectType) => {
     switch (projectType) {
@@ -161,7 +982,7 @@ const installModInternal = async (win, { instanceName, serverSafeName, projectId
             if (isServer) {
                 emitServerInstallLog(win, instanceName, `File already exists, skipping: ${filename}`);
             }
-            return { success: true, skipped: true };
+            return { success: true, skipped: true, destination: dest };
         }
 
         const maxAttempts = 2;
@@ -305,7 +1126,7 @@ const installModInternal = async (win, { instanceName, serverSafeName, projectId
             }
         }
 
-        return { success: true };
+        return { success: true, destination: dest };
 
     } catch (e) {
         console.error("Modrinth Install Error:", e);
@@ -392,21 +1213,96 @@ const resolveDependenciesInternal = async (versionId, loaders = [], gameVersions
 module.exports = (ipcMain, win) => {
     ipcMain.handle('modrinth:search', async (_, query, facets = [], options = {}) => {
         try {
-            const { limit = 20, offset = 0, index, projectType = 'mod' } = options;
+            const { limit = 20, offset = 0, index, projectType = 'mod', includeCurseforge = false } = options;
+            const normalizedLimit = Math.max(1, Number(limit) || 20);
+            const normalizedOffset = Math.max(0, Number(offset) || 0);
+            const normalizedIndex = getNormalizedSearchIndex(index);
+            const baseFetchLimit = includeCurseforge
+                ? Math.min(Math.max(normalizedLimit + normalizedOffset, normalizedLimit), 100)
+                : normalizedLimit;
+            const mergeFetchBuffer = 30;
+            const mergeCandidateTarget = normalizedOffset + normalizedLimit + mergeFetchBuffer;
+            const modrinthFetchLimit = includeCurseforge
+                ? Math.min(Math.max(baseFetchLimit, mergeCandidateTarget), 100)
+                : baseFetchLimit;
+            const curseforgeFetchLimit = includeCurseforge
+                ? Math.min(Math.max(baseFetchLimit, mergeCandidateTarget), 250)
+                : baseFetchLimit;
             const facetStr = JSON.stringify([[`project_type:${projectType}`], ...facets]);
-            const params = { query, facets: facetStr, limit, offset };
-            if (index) params.index = index;
 
-            const response = await axios.get(`${MODRINTH_API}/search`, {
-                params,
-                headers: { 'User-Agent': USER_AGENT }
-            });
+            const params = {
+                query,
+                facets: facetStr,
+                limit: modrinthFetchLimit,
+                offset: includeCurseforge ? 0 : normalizedOffset
+            };
+            if (normalizedIndex) params.index = normalizedIndex;
+
+            let modrinthResponseData = {
+                hits: [],
+                total_hits: 0,
+                offset: includeCurseforge ? 0 : normalizedOffset,
+                limit: modrinthFetchLimit
+            };
+
+            try {
+                const response = await axios.get(`${MODRINTH_API}/search`, {
+                    params,
+                    headers: { 'User-Agent': USER_AGENT }
+                });
+                modrinthResponseData = response.data;
+            } catch (modrinthError) {
+                if (!includeCurseforge) {
+                    throw modrinthError;
+                }
+                console.warn('[Modrinth:Search] Modrinth API unavailable, trying CurseForge fallback:', modrinthError.message);
+            }
+
+            const modrinthResults = (modrinthResponseData.hits || []).map((hit, rank) => ({
+                ...hit,
+                source: 'modrinth',
+                __providerRank: rank
+            }));
+            let results = modrinthResults;
+            let totalHits = Number(modrinthResponseData.total_hits || 0);
+
+            if (includeCurseforge) {
+                try {
+                    const curseforgeResult = await searchCurseForge({
+                        query,
+                        projectType,
+                        limit: curseforgeFetchLimit,
+                        offset: 0,
+                        index: normalizedIndex
+                    });
+
+                    const curseforgeResults = (curseforgeResult.results || []).map((hit, rank) => ({
+                        ...hit,
+                        __providerRank: rank
+                    }));
+
+                    totalHits += Number(curseforgeResult.total_hits || 0);
+                    const deduplicated = mergeDuplicateSearchEntries([...modrinthResults, ...curseforgeResults]);
+                    totalHits = deduplicated.length;
+                    const merged = sortMergedSearchResults(deduplicated, normalizedIndex);
+
+                    results = merged.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+                } catch (curseforgeError) {
+                    console.warn('[CurseForge:Search] Failed to enrich search results:', curseforgeError.message);
+                    results = results.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+                }
+            }
+
             return {
                 success: true,
-                results: response.data.hits,
-                total_hits: response.data.total_hits,
-                offset: response.data.offset,
-                limit: response.data.limit
+                results: results.map(stripSearchInternalFields),
+                total_hits: totalHits,
+                offset: includeCurseforge
+                    ? normalizedOffset
+                    : Number(modrinthResponseData.offset || normalizedOffset),
+                limit: includeCurseforge
+                    ? normalizedLimit
+                    : Number(modrinthResponseData.limit || normalizedLimit)
             };
         } catch (e) {
             console.error("Modrinth Search Error:", e.response ? e.response.data : e.message);
@@ -415,48 +1311,131 @@ module.exports = (ipcMain, win) => {
     });
 
     ipcMain.handle('modrinth:install', async (_, data) => {
-        if (data.projectType === 'mod' || data.projectType === 'plugin') {
-            try {
-                let loader = 'vanilla';
-                let version = '';
+        const isCurseForgeInstall =
+            isCurseForgeProjectId(String(data?.projectId || '')) ||
+            String(data?.source || '').toLowerCase() === 'curseforge' ||
+            isCurseForgeVersionId(String(data?.versionId || ''));
 
-                if (data.isServer) {
-                    const serversDir = path.join(appData, 'servers');
-                    const resolvedSafeName = await resolveServerSafeName(data.instanceName, data.serverSafeName);
-                    const serverJsonPath = path.join(serversDir, resolvedSafeName, 'server.json');
-                    if (await fs.pathExists(serverJsonPath)) {
-                        const serverConfig = await fs.readJson(serverJsonPath);
-                        loader = serverConfig.software ? serverConfig.software.toLowerCase() : 'vanilla';
-                        version = serverConfig.version;
-                    }
-                } else {
-                    const instanceJsonPath = path.join(instancesDir, data.instanceName, 'instance.json');
-                    if (await fs.pathExists(instanceJsonPath)) {
-                        const instance = await fs.readJson(instanceJsonPath);
-                        loader = instance.loader ? instance.loader.toLowerCase() : 'vanilla';
-                        version = instance.version;
-                    }
+        const normalizedData = {
+            ...data,
+            projectId: normalizeModrinthProjectId(data?.projectId)
+        };
+
+        if (isCurseForgeInstall) {
+            try {
+                const mappedFallbackCurseForgeProjectId = modrinthToCurseForgeProjectMap.get(normalizeModrinthProjectId(String(data?.projectId || '')));
+                const resolvedCurseForgeProjectId =
+                    normalizeCurseForgeProjectId(data?.projectId)
+                    || normalizeCurseForgeProjectId(data?.curseforgeProjectId)
+                    || normalizeCurseForgeProjectId(data?.fallbackCurseForgeProjectId)
+                    || normalizeCurseForgeProjectId(mappedFallbackCurseForgeProjectId);
+
+                const numericProjectId = parseCurseForgeProjectId(resolvedCurseForgeProjectId);
+                if (!Number.isFinite(numericProjectId)) {
+                    return { success: false, error: 'Invalid CurseForge project ID' };
                 }
+
+                let resolvedVersionId = parseCurseForgeVersionId(data.versionId);
+                let resolvedFilename = data.filename;
+                let resolvedUrl = data.url;
+                let resolvedVersionName = data.versionName || null;
+
+                if ((!resolvedFilename || !resolvedUrl) && Number.isFinite(resolvedVersionId)) {
+                    const fileData = await getCurseForgeFile(numericProjectId, resolvedVersionId);
+                    resolvedFilename = resolvedFilename || fileData?.fileName;
+                    resolvedUrl = resolvedUrl || fileData?.downloadUrl;
+                    resolvedVersionName = resolvedVersionName || fileData?.displayName || fileData?.fileName || null;
+                }
+
+                if (!resolvedFilename || !resolvedUrl) {
+                    const { loader, version } = await resolveInstallContext(data);
+                    const allFiles = await getCurseForgeFiles(numericProjectId, 100);
+                    const compatibleFiles = allFiles
+                        .filter(file => isCurseForgeLoaderCompatible(file, loader && loader !== 'vanilla' ? [loader] : []))
+                        .filter(file => isCurseForgeGameVersionCompatible(file, version ? [version] : []))
+                        .sort((left, right) => sortByDateDesc(left, right, 'fileDate'));
+
+                    const selectedFile = compatibleFiles[0] || allFiles.sort((left, right) => sortByDateDesc(left, right, 'fileDate'))[0];
+
+                    if (!selectedFile) {
+                        return { success: false, error: 'No compatible CurseForge file found' };
+                    }
+
+                    resolvedVersionId = selectedFile.id;
+                    resolvedFilename = selectedFile.fileName;
+                    resolvedUrl = selectedFile.downloadUrl;
+                    resolvedVersionName = resolvedVersionName || selectedFile.displayName || selectedFile.fileName || null;
+                }
+
+                if (!resolvedFilename || !resolvedUrl) {
+                    return { success: false, error: 'Could not resolve CurseForge download file' };
+                }
+
+                let projectTitle = data.title || null;
+                let projectIcon = data.iconUrl || data.icon || null;
+                try {
+                    const projectData = await getCurseForgeProject(numericProjectId);
+                    projectTitle = projectTitle || projectData?.name || null;
+                    projectIcon = projectIcon || projectData?.logo?.url || projectData?.logo?.thumbnailUrl || null;
+                } catch (projectError) {
+                    console.warn('[CurseForge:Install] Could not fetch project metadata:', projectError.message);
+                }
+
+                const cacheVersionId = Number.isFinite(resolvedVersionId)
+                    ? toCurseForgeVersionId(resolvedVersionId)
+                    : data.versionId;
+                const cacheProjectId = toCurseForgeProjectId(numericProjectId);
+
+                const installResult = await installModInternal(win, {
+                    ...data,
+                    projectId: cacheProjectId,
+                    versionId: cacheVersionId,
+                    filename: resolvedFilename,
+                    url: resolvedUrl
+                });
+
+                if (installResult.success && installResult.destination) {
+                    await updateModCacheForInstall({
+                        destination: installResult.destination,
+                        projectId: cacheProjectId,
+                        versionId: cacheVersionId,
+                        source: 'curseforge',
+                        title: projectTitle,
+                        icon: projectIcon,
+                        version: resolvedVersionName
+                    });
+                }
+
+                return installResult;
+            } catch (error) {
+                console.error('[CurseForge:Install] Error:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        if (normalizedData.projectType === 'mod' || normalizedData.projectType === 'plugin') {
+            try {
+                const { loader, version } = await resolveInstallContext(normalizedData);
 
                 if (loader !== 'vanilla' && version) {
 
                     const resolveLoader = ['spigot', 'bukkit', 'purpur', 'folia'].includes(loader) ? 'paper' : loader;
 
-                    const resolveRes = await resolveDependenciesInternal(data.versionId, [resolveLoader], [version]);
+                    const resolveRes = await resolveDependenciesInternal(normalizedData.versionId, [resolveLoader], [version]);
 
                     if (resolveRes.success && resolveRes.dependencies.length > 0) {
                         let successCount = 0;
                         let failCount = 0;
                         for (const dep of resolveRes.dependencies) {
                             const installRes = await installModInternal(win, {
-                                instanceName: data.instanceName,
-                                serverSafeName: data.serverSafeName,
+                                instanceName: normalizedData.instanceName,
+                                serverSafeName: normalizedData.serverSafeName,
                                 projectId: dep.projectId,
                                 versionId: dep.versionId,
                                 filename: dep.filename,
                                 url: dep.url,
-                                projectType: dep.projectType || data.projectType,
-                                isServer: data.isServer
+                                projectType: dep.projectType || normalizedData.projectType,
+                                isServer: normalizedData.isServer
                             });
 
                             if (installRes.success) successCount++;
@@ -470,19 +1449,41 @@ module.exports = (ipcMain, win) => {
                 console.error("[Modrinth:Install] Dependency resolution failed, falling back to single install:", err);
             }
         }
-        return await installModInternal(win, data);
+        return await installModInternal(win, normalizedData);
     });
 
-    ipcMain.handle('modrinth:get-versions', async (_, projectId, loaders = [], gameVersions = []) => {
+    ipcMain.handle('modrinth:get-versions', async (_, projectId, loaders = [], gameVersions = [], fallbackCurseForgeProjectId = null) => {
         try {
+            if (isCurseForgeProjectId(projectId)) {
+                const versions = await getCurseForgeCompatibleVersions(projectId, loaders, gameVersions);
+
+                return { success: true, versions };
+            }
+
             const params = {};
+            const normalizedProjectId = normalizeModrinthProjectId(projectId);
+            const explicitFallbackCurseForgeProjectId = normalizeCurseForgeProjectId(fallbackCurseForgeProjectId);
             if (loaders.length) params.loaders = JSON.stringify(loaders);
             if (gameVersions.length) params.game_versions = JSON.stringify(gameVersions);
-            const response = await axios.get(`${MODRINTH_API}/project/${projectId}/version`, {
+            const response = await axios.get(`${MODRINTH_API}/project/${normalizedProjectId}/version`, {
                 params,
                 headers: { 'User-Agent': USER_AGENT }
             });
-            return { success: true, versions: response.data };
+            const modrinthVersions = Array.isArray(response?.data) ? response.data : [];
+            if (modrinthVersions.length > 0) {
+                return { success: true, versions: modrinthVersions };
+            }
+
+            const mappedCurseForgeProjectId = modrinthToCurseForgeProjectMap.get(normalizedProjectId);
+            const resolvedCurseForgeFallbackProjectId = explicitFallbackCurseForgeProjectId || mappedCurseForgeProjectId;
+            if (resolvedCurseForgeFallbackProjectId) {
+                const fallbackVersions = await getCurseForgeCompatibleVersions(resolvedCurseForgeFallbackProjectId, loaders, gameVersions);
+                if (fallbackVersions.length > 0) {
+                    return { success: true, versions: fallbackVersions };
+                }
+            }
+
+            return { success: true, versions: modrinthVersions };
         } catch (e) {
             return { success: false, error: e.message };
         }
@@ -537,10 +1538,51 @@ module.exports = (ipcMain, win) => {
 
     ipcMain.handle('modrinth:get-project', async (_, projectId) => {
         try {
-            const response = await axios.get(`${MODRINTH_API}/project/${projectId}`, {
+            if (isCurseForgeProjectId(projectId)) {
+                const projectData = await getCurseForgeProject(projectId);
+                const gallery = Array.isArray(projectData?.screenshots)
+                    ? projectData.screenshots.map((item) => ({
+                        url: item?.url || item?.thumbnailUrl,
+                        title: item?.title || ''
+                    })).filter(item => !!item.url)
+                    : [];
+
+                const project = {
+                    id: toCurseForgeProjectId(projectData.id),
+                    title: projectData.name,
+                    slug: projectData.slug,
+                    description: projectData.summary || '',
+                    icon_url: projectData.logo?.url || projectData.logo?.thumbnailUrl || null,
+                    project_type: mapCurseForgeClassToProjectType(projectData.classId),
+                    downloads: Number(projectData.downloadCount || 0),
+                    source: 'curseforge',
+                    author: Array.isArray(projectData.authors) && projectData.authors.length > 0 ? projectData.authors[0].name : 'Unknown',
+                    gallery,
+                    body: ''
+                };
+
+                return { success: true, project };
+            }
+
+            const normalizedProjectId = normalizeModrinthProjectId(projectId);
+            const response = await axios.get(`${MODRINTH_API}/project/${normalizedProjectId}`, {
                 headers: { 'User-Agent': USER_AGENT }
             });
             const project = response.data;
+
+            const mappedCurseForgeProjectId = modrinthToCurseForgeProjectMap.get(normalizedProjectId);
+            if (mappedCurseForgeProjectId) {
+                project.curseforge_project_id = mappedCurseForgeProjectId;
+                if (!project.icon_url) {
+                    try {
+                        const curseForgeProject = await getCurseForgeProject(mappedCurseForgeProjectId);
+                        project.icon_url = curseForgeProject?.logo?.url || curseForgeProject?.logo?.thumbnailUrl || project.icon_url || null;
+                    } catch (fallbackError) {
+                        console.warn('[Modrinth:GetProject] Could not hydrate icon from CurseForge:', fallbackError.message);
+                    }
+                }
+            }
+
             if (project.team) {
                 try {
                     const teamRes = await axios.get(`${MODRINTH_API}/team/${project.team}/members`, {
@@ -563,6 +1605,9 @@ module.exports = (ipcMain, win) => {
     });
 
     ipcMain.handle('modrinth:resolve-dependencies', async (_, versionId, loaders = [], gameVersions = []) => {
+        if (isCurseForgeVersionId(versionId)) {
+            return { success: true, dependencies: [] };
+        }
         return await resolveDependenciesInternal(versionId, loaders, gameVersions);
     });
 };

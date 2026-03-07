@@ -3,6 +3,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import LoadingOverlay from '../components/LoadingOverlay';
 import FileBrowser from '../components/FileBrowser';
+import { getSourceTags } from '../utils/sourceTags';
 
 function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGuest }) {
     const { addNotification } = useNotification();
@@ -1034,7 +1035,8 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
             const result = await window.electronAPI.modrinthSearch(query, facets, {
                 projectType: getServerContentType(),
-                limit: 10
+                limit: 10,
+                includeCurseforge: true
             });
 
             if (result.success) {
@@ -1051,7 +1053,13 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         }
     };
 
-    const loadModVersions = async (projectId) => {
+    const loadModVersions = async (project) => {
+        const projectId = typeof project === 'string' ? project : project?.project_id;
+        const fallbackCurseForgeProjectId = typeof project === 'string' ? null : project?.curseforge_project_id || null;
+        if (!projectId) {
+            return;
+        }
+
         if (modVersions[projectId]) {
             return;
         }
@@ -1063,7 +1071,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                 ? ['bukkit', 'spigot', 'paper', 'purpur', 'folia']
                 : [getLoaderForModrinth(activeTab)];
 
-            const result = await window.electronAPI.getModVersions(projectId, loaders, [server.version]);
+            const result = await window.electronAPI.getModVersions(projectId, loaders, [server.version], fallbackCurseForgeProjectId);
 
             if (result.success) {
                 const versions = Array.isArray(result.versions) ? [...result.versions] : [];
@@ -1098,7 +1106,14 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         }
     };
 
-    const installMod = async (projectId, versionId, projectTitle) => {
+    const installMod = async (project, versionId, projectTitle) => {
+        const projectId = typeof project === 'string' ? project : project?.project_id;
+        const fallbackCurseForgeProjectId = typeof project === 'string' ? null : project?.curseforge_project_id || null;
+        if (!projectId) {
+            addNotification('Project ID not found', 'error');
+            return;
+        }
+
         if (!versionId) {
             addNotification('No compatible version found for your server', 'error');
             return;
@@ -1115,11 +1130,13 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
             }
 
             const file = version.files.find(f => f.primary) || version.files[0];
+            const installProjectId = version.project_id || projectId;
 
             const result = await window.electronAPI.modrinthInstall({
                 instanceName: getServerIdentifier(),
                 serverSafeName: server.safeName,
-                projectId: projectId,
+                projectId: installProjectId,
+                fallbackCurseForgeProjectId,
                 versionId: versionId,
                 filename: file.filename,
                 url: file.url,
@@ -1194,7 +1211,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
         modSearchResults.forEach((result) => {
             if (!modVersions[result.project_id] && !loadingVersions.has(result.project_id)) {
-                loadModVersions(result.project_id);
+                loadModVersions(result);
             }
         });
     }, [activeTab, modsViewMode, modSearchResults]);
@@ -1735,7 +1752,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                 Server must be running to send commands
                             </p>
                         )}
-                        
+
                         {server.playitAddress && (
                             <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between animate-in fade-in zoom-in duration-300">
                                 <div className="flex items-center gap-3">
@@ -1772,7 +1789,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                 </div>
                             </div>
 
-                            
+
                             {server.playitAddress && (
                                 <div className="mb-8 p-6 bg-green-500/20 border border-green-500/30 rounded-xl shadow-md animate-in fade-in slide-in-from-top-4 duration-500 text-center relative group">
                                     <h3 className="text-xl font-bold text-foreground mb-2">Server Public!</h3>
@@ -1840,7 +1857,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                             )}
 
                             <div className="grid grid-cols-1 gap-6">
-                                
+
                                 <div className={`relative group p-6 rounded-xl border transition-all ${server.playitPluginInstalled ? 'bg-primary/5 border-primary/50 shadow-md' : 'bg-card/40 border-border hover:border-border'} ${!playitAvailable && !playitChecking ? 'opacity-50 grayscale' : ''}`}>
                                     <div className="flex items-start justify-between mb-4">
                                         <div className={`p-3 rounded-xl ${server.playitPluginInstalled ? 'bg-primary text-black' : 'bg-muted text-muted-foreground'}`}>
@@ -2391,7 +2408,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                             type="text"
                                             value={modSearch}
                                             onChange={(e) => setModSearch(e.target.value)}
-                                            placeholder={`Search ${getContentLabelPlural()} on Modrinth...`}
+                                            placeholder={`Search ${getContentLabelPlural()} on Modrinth / CurseForge...`}
                                             className="flex-1 bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                         />
                                         <button
@@ -2416,6 +2433,11 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                                                     <span className="text-xs bg-muted px-2 py-1 rounded text-foreground">
                                                                         Downloads: {Math.floor(result.downloads / 1000)}K
                                                                     </span>
+                                                                    {getSourceTags(result.source, result.sources).map((sourceTag) => (
+                                                                        <span key={`${result.project_id}-${sourceTag}`} className="text-xs bg-muted px-2 py-1 rounded text-foreground uppercase">
+                                                                            {sourceTag}
+                                                                        </span>
+                                                                    ))}
                                                                     <span className="text-xs bg-muted px-2 py-1 rounded text-foreground">
                                                                         ⭐ {result.follows > 0 ? Math.floor(result.follows / 100) : '0'}
                                                                     </span>
@@ -2441,7 +2463,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                                                 }}
                                                                 onClick={() => {
                                                                     if (!modVersions[result.project_id]) {
-                                                                        loadModVersions(result.project_id);
+                                                                        loadModVersions(result);
                                                                     }
                                                                 }}
                                                                 className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
@@ -2456,7 +2478,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                                                 ))}
                                                             </select>
                                                             <button
-                                                                onClick={() => installMod(result.project_id, selectedModVersion[result.project_id], result.title)}
+                                                                onClick={() => installMod(result, selectedModVersion[result.project_id], result.title)}
                                                                 disabled={isInstallingMod || !selectedModVersion[result.project_id]}
                                                                 className="px-6 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm"
                                                             >
@@ -2508,7 +2530,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6">
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4 md:col-span-2">
                                     <h3 className="font-bold text-foreground mb-4">Server Settings</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2569,7 +2591,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4">
                                     <h3 className="font-bold text-foreground mb-4">Gameplay</h3>
                                     <div className="space-y-3">
@@ -2634,7 +2656,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4">
                                     <h3 className="font-bold text-foreground mb-4">World</h3>
                                     <div className="space-y-3">
@@ -2668,7 +2690,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4">
                                     <h3 className="font-bold text-foreground mb-4">Network</h3>
                                     <div className="space-y-3">
@@ -2720,7 +2742,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4">
                                     <h3 className="font-bold text-foreground mb-4">Players</h3>
                                     <div className="space-y-3">
@@ -2754,7 +2776,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     </div>
                                 </div>
 
-                                
+
                                 <div className="bg-card/40 rounded-xl p-4 md:col-span-2">
                                     <h3 className="font-bold text-foreground mb-4">Advanced Settings</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

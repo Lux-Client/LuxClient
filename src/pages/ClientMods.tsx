@@ -5,6 +5,7 @@ import {
     DEFAULT_OPEN_CLIENT_MOD_IDS,
     sanitizeClientCustomAutoInstallModIds
 } from '../config/clientDefaults';
+import { getSourceTags } from '../utils/sourceTags';
 
 function ClientMods() {
     const { t } = useTranslation();
@@ -260,7 +261,8 @@ function ClientMods() {
                 offset: targetOffset,
                 limit,
                 index: sortMethod,
-                projectType: 'mod'
+                projectType: 'mod',
+                includeCurseforge: true
             });
 
             if (response?.success) {
@@ -280,7 +282,7 @@ function ClientMods() {
         }
     };
 
-    const installProjectForVersions = async ({ projectId, projectTitle, targetVersions }) => {
+    const installProjectForVersions = async ({ projectId, projectTitle, targetVersions, fallbackCurseForgeProjectId = null }) => {
         let installedCount = 0;
         let skippedCount = 0;
         let incompatibleCount = 0;
@@ -302,7 +304,7 @@ function ClientMods() {
                 continue;
             }
 
-            const versionsResponse = await window.electronAPI.getModVersions(projectId, ['fabric'], [version]);
+            const versionsResponse = await window.electronAPI.getModVersions(projectId, ['fabric'], [version], fallbackCurseForgeProjectId);
             if (!versionsResponse?.success || !Array.isArray(versionsResponse.versions) || versionsResponse.versions.length === 0) {
                 incompatibleCount += 1;
                 continue;
@@ -316,9 +318,11 @@ function ClientMods() {
             }
 
             for (const instance of pendingInstances) {
+                const installProjectId = targetVersion.project_id || projectId;
                 const installResponse = await window.electronAPI.installMod({
                     instanceName: instance.name,
-                    projectId,
+                    projectId: installProjectId,
+                    fallbackCurseForgeProjectId,
                     versionId: targetVersion.id,
                     filename: file.filename,
                     url: file.url,
@@ -376,7 +380,8 @@ function ClientMods() {
             await installProjectForVersions({
                 projectId,
                 projectTitle: project.title || project.slug || projectId,
-                targetVersions: selectedVersions
+                targetVersions: selectedVersions,
+                fallbackCurseForgeProjectId: project.curseforge_project_id || null
             });
             await loadInstalledMods();
         } catch (error) {
@@ -407,7 +412,8 @@ function ClientMods() {
             await installProjectForVersions({
                 projectId,
                 projectTitle: project.title || project.slug || projectId,
-                targetVersions: availableVersions
+                targetVersions: availableVersions,
+                fallbackCurseForgeProjectId: project.curseforge_project_id || null
             });
 
             await loadInstalledMods();
@@ -656,6 +662,13 @@ function ClientMods() {
                                             <div className="min-w-0 flex-1">
                                                 <div className="font-bold text-foreground truncate">{result.title}</div>
                                                 <div className="text-xs text-muted-foreground line-clamp-1">{result.description}</div>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {getSourceTags(result.source, result.sources).map((sourceTag) => (
+                                                        <span key={`${projectId || result.slug}-${sourceTag}`} className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                                            {sourceTag}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
 

@@ -41,6 +41,7 @@ import {
     ChevronRight,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getSourceTags } from '../utils/sourceTags';
 
 function Search({ initialCategory, onCategoryConsumed }) {
     const { t } = useTranslation();
@@ -50,7 +51,7 @@ function Search({ initialCategory, onCategoryConsumed }) {
     const [loading, setLoading] = useState(false);
     const [projectType, setProjectType] = useState(initialCategory || 'mod');
     const [offset, setOffset] = useState(0);
-    const limit = 20;
+    const limit = 21;
     const [totalHits, setTotalHits] = useState(0);
     const [sortMethod, setSortMethod] = useState('relevance');
     useEffect(() => {
@@ -183,7 +184,8 @@ function Search({ initialCategory, onCategoryConsumed }) {
                 offset: nextOffset,
                 limit,
                 index: sortMethod,
-                projectType
+                projectType,
+                includeCurseforge: projectType === 'mod'
             });
 
             if (res.success) {
@@ -369,7 +371,12 @@ function Search({ initialCategory, onCategoryConsumed }) {
                 ? []
                 : [instance.loader];
 
-            const res = await window.electronAPI.getModVersions(selectedMod.project_id, loaders, [instance.version]);
+            const res = await window.electronAPI.getModVersions(
+                selectedMod.project_id,
+                loaders,
+                [instance.version],
+                selectedMod.curseforge_project_id || null
+            );
 
             if (res.success && res.versions.length > 0) {
                 const version = res.versions[0];
@@ -383,14 +390,16 @@ function Search({ initialCategory, onCategoryConsumed }) {
                 } else {
 
                     const file = version.files.find(f => f.primary) || version.files[0];
+                    const installProjectId = version.project_id || selectedMod.project_id;
                     await executeInstallList([{
                         instanceName: instance.name,
-                        projectId: selectedMod.project_id,
+                        projectId: installProjectId,
                         versionId: version.id,
                         filename: file.filename,
                         url: file.url,
                         projectType: selectedMod.project_type,
-                        title: selectedMod.title
+                        title: selectedMod.title,
+                        fallbackCurseForgeProjectId: selectedMod.curseforge_project_id || null
                     }]);
                 }
             } else {
@@ -415,6 +424,7 @@ function Search({ initialCategory, onCategoryConsumed }) {
                 const res = await window.electronAPI.installMod({
                     instanceName: item.instanceName,
                     projectId: item.projectId,
+                    fallbackCurseForgeProjectId: item.fallbackCurseForgeProjectId || null,
                     versionId: item.versionId,
                     filename: item.filename,
                     url: item.url,
@@ -574,6 +584,9 @@ function Search({ initialCategory, onCategoryConsumed }) {
                                                 <p className="text-xs text-muted-foreground mt-0.5">{mod.author}</p>
                                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                                     <Badge variant="secondary" className="text-[10px] capitalize">{mod.project_type}</Badge>
+                                                    {getSourceTags(mod.source, mod.sources).map((sourceTag) => (
+                                                        <Badge key={`${mod.project_id}-${sourceTag}`} variant="outline" className="text-[10px] uppercase">{sourceTag}</Badge>
+                                                    ))}
                                                     <Badge variant="outline" className="text-[10px]">
                                                         <ArrowDownToLine className="h-3 w-3 mr-1" />
                                                         {formatDownloads(mod.downloads)}

@@ -104,6 +104,7 @@ function Client() {
                 .map((mod) => ({
                     projectId: mod.projectId,
                     versionId: mod.versionId,
+                    source: mod.source,
                     type: 'mod',
                     name: mod.name
                 }));

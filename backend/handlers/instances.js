@@ -33,7 +33,69 @@ const FABRIC_META = 'https://meta.fabricmc.net/v2';
 const QUILT_META = 'https://meta.quiltmc.org/v3';
 const FORGE_META = 'https://meta.modrinth.com/forge/v0';
 const NEOFORGE_META = 'https://meta.modrinth.com/neo/v0';
+const CURSEFORGE_API = 'https://api.curse.tools/v1/cf';
+const CURSEFORGE_PROJECT_PREFIX = 'curseforge:';
+const MODRINTH_PROJECT_PREFIX = 'modrinth:';
 const activeTasks = new Map();
+
+const CURSEFORGE_AUTOINSTALL_LOADER_ALIASES = {
+    forge: ['forge'],
+    neoforge: ['neoforge', 'neo forge'],
+    fabric: ['fabric'],
+    quilt: ['quilt'],
+    paper: ['paper', 'spigot', 'bukkit', 'purpur', 'folia'],
+    spigot: ['spigot', 'paper', 'bukkit', 'purpur', 'folia'],
+    bukkit: ['bukkit', 'paper', 'spigot', 'purpur', 'folia'],
+    purpur: ['purpur', 'paper', 'spigot', 'bukkit', 'folia'],
+    folia: ['folia', 'paper', 'spigot', 'bukkit', 'purpur'],
+    vanilla: []
+};
+
+const parseAutoInstallModEntry = (entry) => {
+    const raw = String(entry || '').trim();
+    if (!raw) {
+        return { source: 'modrinth', projectId: '' };
+    }
+
+    if (raw.startsWith(CURSEFORGE_PROJECT_PREFIX)) {
+        return {
+            source: 'curseforge',
+            projectId: raw.slice(CURSEFORGE_PROJECT_PREFIX.length)
+        };
+    }
+
+    if (raw.startsWith(MODRINTH_PROJECT_PREFIX)) {
+        return {
+            source: 'modrinth',
+            projectId: raw.slice(MODRINTH_PROJECT_PREFIX.length)
+        };
+    }
+
+    return { source: 'modrinth', projectId: raw };
+};
+
+const isCurseForgeAutoInstallLoaderCompatible = (file, loader) => {
+    const normalizedLoader = String(loader || '').toLowerCase();
+    if (!normalizedLoader || normalizedLoader === 'vanilla') return true;
+
+    const aliases = CURSEFORGE_AUTOINSTALL_LOADER_ALIASES[normalizedLoader] || [normalizedLoader];
+    const gameVersions = Array.isArray(file?.gameVersions)
+        ? file.gameVersions.map((entry) => String(entry || '').toLowerCase())
+        : [];
+
+    return aliases.some(alias => gameVersions.includes(alias));
+};
+
+const isCurseForgeAutoInstallVersionCompatible = (file, mcVersion) => {
+    const normalizedVersion = String(mcVersion || '').toLowerCase();
+    if (!normalizedVersion) return true;
+
+    const gameVersions = Array.isArray(file?.gameVersions)
+        ? file.gameVersions.map((entry) => String(entry || '').toLowerCase())
+        : [];
+
+    return gameVersions.includes(normalizedVersion);
+};
 async function downloadFile(url, destPath, signal = null, retries = 1) {
     let lastError;
     for (let i = 0; i <= retries; i++) {
@@ -411,7 +473,7 @@ module.exports = (ipcMain, win) => {
             (async () => {
                 const task = activeTasks.get(finalName);
                 if (!task) return;
-                let sendCompletion = async () => {};
+                let sendCompletion = async () => { };
 
                 try {
 
@@ -800,11 +862,114 @@ module.exports = (ipcMain, win) => {
                             const loaderName = (loader || 'vanilla').toLowerCase();
                             let installedCount = 0;
                             let skippedCount = 0;
+                            const modCachePath = path.join(appData, 'mod_cache.json');
 
-                            for (const projectId of settings.autoInstallMods) {
+                            const updateAutoInstallCache = async ({ filePath, fileName, title, projectId, versionId, source }) => {
+                                try {
+                                    if (!await fs.pathExists(filePath)) return;
+                                    const stats = await fs.stat(filePath);
+                                    const cacheKey = `${fileName}-${stats.size}`;
+                                    let modCache = {};
+
+                                    if (await fs.pathExists(modCachePath)) {
+                                        modCache = await fs.readJson(modCachePath).catch(() => ({}));
+                                    }
+
+                                    modCache[cacheKey] = {
+                                        title: title || fileName,
+                                        icon: null,
+                                        version: title || null,
+                                        projectId,
+                                        versionId,
+                                        source,
+                                        timestamp: Date.now()
+                                    };
+
+                                    await fs.writeJson(modCachePath, modCache);
+                                } catch (cacheError) {
+                                    appendLog(`Failed to cache auto install metadata for ${fileName}: ${cacheError.message}`);
+                                }
+                            };
+
+                            for (const configuredEntry of settings.autoInstallMods) {
                                 if (task.aborted) break;
 
+                                const parsedEntry = parseAutoInstallModEntry(configuredEntry);
+                                const projectId = parsedEntry.projectId;
+
+                                if (!projectId) {
+                                    skippedCount++;
+                                    continue;
+                                }
+
                                 try {
+                                    if (parsedEntry.source === 'curseforge') {
+                                        const numericProjectId = Number.parseInt(projectId, 10);
+                                        if (!Number.isFinite(numericProjectId)) {
+                                            appendLog(`Invalid CurseForge project id: ${configuredEntry}`);
+                                            skippedCount++;
+                                            continue;
+                                        }
+
+                                        const filesRes = await axios.get(
+                                            `${CURSEFORGE_API}/mods/${numericProjectId}/files`,
+                                            {
+                                                params: {
+                                                    pageSize: 100,
+                                                    index: 0
+                                                },
+                                                headers: {
+                                                    'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)'
+                                                }
+                                            }
+                                        );
+
+                                        const allFiles = Array.isArray(filesRes?.data?.data) ? filesRes.data.data : [];
+                                        const compatibleFiles = allFiles
+                                            .filter(file => isCurseForgeAutoInstallLoaderCompatible(file, loaderName))
+                                            .filter(file => isCurseForgeAutoInstallVersionCompatible(file, version))
+                                            .sort((left, right) => new Date(right?.fileDate || 0).getTime() - new Date(left?.fileDate || 0).getTime());
+
+                                        const selectedFile = compatibleFiles[0] || allFiles
+                                            .sort((left, right) => new Date(right?.fileDate || 0).getTime() - new Date(left?.fileDate || 0).getTime())[0];
+
+                                        if (!selectedFile || !selectedFile.downloadUrl) {
+                                            appendLog(`CurseForge auto install mod ${projectId} not available for ${loaderName} ${version} - skipping`);
+                                            skippedCount++;
+                                            continue;
+                                        }
+
+                                        const fileName = selectedFile.fileName || `${numericProjectId}-${selectedFile.id}.jar`;
+                                        const dest = path.join(modsDir, fileName);
+
+                                        if (!await fs.pathExists(dest)) {
+                                            appendLog(`Downloading auto install mod: ${fileName}`);
+                                            try {
+                                                await downloadFile(selectedFile.downloadUrl, dest);
+                                                appendLog(`Installed auto install mod: ${fileName}`);
+                                                installedCount++;
+                                            } catch (downloadError) {
+                                                appendLog(`Skipping auto install mod ${fileName} after failed retries: ${downloadError.message}`);
+                                                skippedCount++;
+                                                continue;
+                                            }
+                                        } else {
+                                            appendLog(`Auto install mod already exists: ${fileName}`);
+                                            installedCount++;
+                                        }
+
+                                        await updateAutoInstallCache({
+                                            filePath: dest,
+                                            fileName,
+                                            title: selectedFile.displayName || fileName,
+                                            projectId: `curseforge:${numericProjectId}`,
+                                            versionId: `cf-file:${selectedFile.id}`,
+                                            source: 'curseforge'
+                                        });
+
+                                        continue;
+                                    }
+
                                     const versionsRes = await axios.get(
                                         `${MODRINTH_API}/project/${projectId}/version`,
                                         {
@@ -839,7 +1004,7 @@ module.exports = (ipcMain, win) => {
                                         skippedCount++;
                                     }
                                 } catch (e) {
-                                    appendLog(`Auto install mod ${projectId} installation failed: ${e.message} - skipping`);
+                                    appendLog(`Auto install mod ${configuredEntry} installation failed: ${e.message} - skipping`);
                                     skippedCount++;
                                 }
                             }
@@ -2190,7 +2355,8 @@ module.exports = (ipcMain, win) => {
                                     version = modCache[hash].version;
                                     const projectId = modCache[hash].projectId;
                                     const versionId = modCache[hash].versionId;
-                                    const entry = { title, icon, version, projectId, versionId, hash };
+                                    const source = modCache[hash].source || 'modrinth';
+                                    const entry = { title, icon, version, projectId, versionId, hash, source };
                                     modCache[cacheKey] = entry;
                                     cacheUpdates[cacheKey] = entry;
                                 } else {
@@ -2213,7 +2379,7 @@ module.exports = (ipcMain, win) => {
                                         version = versionData.version_number;
                                         const projectId = projectData.id;
                                         const versionId = versionData.id;
-                                        const entry = { title, icon, version, hash, projectId, versionId };
+                                        const entry = { title, icon, version, hash, projectId, versionId, source: 'modrinth' };
                                         modCache[cacheKey] = entry;
                                         cacheUpdates[cacheKey] = entry;
                                     }
@@ -2232,7 +2398,8 @@ module.exports = (ipcMain, win) => {
                             icon: icon,
                             version: version,
                             projectId: modCache[cacheKey]?.projectId,
-                            versionId: modCache[cacheKey]?.versionId
+                            versionId: modCache[cacheKey]?.versionId,
+                            source: modCache[cacheKey]?.source || 'modrinth'
                         };
                     } catch (e) {
                         console.error(`Error processing mod ${fileName}:`, e);
@@ -2316,14 +2483,63 @@ module.exports = (ipcMain, win) => {
                     if (!item.projectId) return { ...item, hasUpdate: false };
 
                     try {
+                        const source = String(item.source || '').toLowerCase();
+                        const isCurseForgeItem = source === 'curseforge' || String(item.projectId).startsWith(CURSEFORGE_PROJECT_PREFIX);
+
+                        if (isCurseForgeItem) {
+                            const numericProjectId = Number.parseInt(String(item.projectId).replace(CURSEFORGE_PROJECT_PREFIX, ''), 10);
+                            if (!Number.isFinite(numericProjectId)) {
+                                return { ...item, hasUpdate: false };
+                            }
+
+                            const filesResponse = await axios.get(`${CURSEFORGE_API}/mods/${numericProjectId}/files`, {
+                                params: {
+                                    pageSize: 100,
+                                    index: 0
+                                },
+                                headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                timeout: 5000
+                            });
+
+                            const allFiles = Array.isArray(filesResponse?.data?.data) ? filesResponse.data.data : [];
+                            const targetLoader = (item.type === 'resourcepack' || item.type === 'shader') ? 'vanilla' : loader;
+                            const compatibleFiles = allFiles
+                                .filter(file => isCurseForgeAutoInstallLoaderCompatible(file, targetLoader))
+                                .filter(file => isCurseForgeAutoInstallVersionCompatible(file, mcVersion))
+                                .sort((left, right) => new Date(right?.fileDate || 0).getTime() - new Date(left?.fileDate || 0).getTime());
+
+                            const latest = compatibleFiles[0] || allFiles
+                                .sort((left, right) => new Date(right?.fileDate || 0).getTime() - new Date(left?.fileDate || 0).getTime())[0];
+
+                            if (!latest) {
+                                return { ...item, hasUpdate: false };
+                            }
+
+                            const currentVersionId = String(item.versionId || '').replace('cf-file:', '');
+                            if (String(latest.id) !== currentVersionId) {
+                                return {
+                                    ...item,
+                                    hasUpdate: true,
+                                    newVersionId: `cf-file:${latest.id}`,
+                                    newVersionNumber: latest.displayName || latest.fileName,
+                                    downloadUrl: latest.downloadUrl,
+                                    filename: latest.fileName
+                                };
+                            }
+
+                            return { ...item, hasUpdate: false };
+                        }
 
                         const loaders = (item.type === 'resourcepack' || item.type === 'shader') ? [] : [loader];
+                        const normalizedProjectId = String(item.projectId || '').startsWith(MODRINTH_PROJECT_PREFIX)
+                            ? String(item.projectId || '').slice(MODRINTH_PROJECT_PREFIX.length)
+                            : item.projectId;
                         const params = {
                             loaders: JSON.stringify(loaders),
                             game_versions: JSON.stringify([mcVersion])
                         };
 
-                        const response = await axios.get(`https://api.modrinth.com/v2/project/${item.projectId}/version`, {
+                        const response = await axios.get(`https://api.modrinth.com/v2/project/${normalizedProjectId}/version`, {
                             params,
                             headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
                             timeout: 5000

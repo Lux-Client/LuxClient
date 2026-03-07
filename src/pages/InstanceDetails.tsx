@@ -8,6 +8,7 @@ import { Analytics } from '../services/Analytics';
 import ToggleBox from '../components/ToggleBox';
 import ExtensionSlot from '../components/Extensions/ExtensionSlot';
 import BackupManagerModal from '../components/BackupManagerModal';
+import { getSourceTags } from '../utils/sourceTags';
 function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate, isGuest }) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('content');
@@ -348,9 +349,9 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
         setCheckingUpdates(true);
         try {
             const contentToCheck = [
-                ...mods.filter(m => m.projectId).map(m => ({ projectId: m.projectId, versionId: m.versionId, type: 'mod', name: m.name })),
-                ...resourcePacks.filter(p => p.projectId).map(p => ({ projectId: p.projectId, versionId: p.versionId, type: 'resourcepack', name: p.name })),
-                ...shaders.filter(s => s.projectId).map(s => ({ projectId: s.projectId, versionId: s.versionId, type: 'shader', name: s.name }))
+                ...mods.filter(m => m.projectId).map(m => ({ projectId: m.projectId, versionId: m.versionId, source: m.source, type: 'mod', name: m.name })),
+                ...resourcePacks.filter(p => p.projectId).map(p => ({ projectId: p.projectId, versionId: p.versionId, source: p.source, type: 'resourcepack', name: p.name })),
+                ...shaders.filter(s => s.projectId).map(s => ({ projectId: s.projectId, versionId: s.versionId, source: s.source, type: 'shader', name: s.name }))
             ];
 
             if (contentToCheck.length === 0) {
@@ -450,7 +451,8 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
             index,
             offset: searchOffset,
             limit,
-            projectType: searchCategory
+            projectType: searchCategory,
+            includeCurseforge: searchCategory === 'mod'
         });
         if (res.success) {
             setSearchResults(res.results);
@@ -535,7 +537,12 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
             const loaders = (searchCategory === 'resourcepack' || searchCategory === 'shader' || !instance.loader || instance.loader.toLowerCase() === 'vanilla')
                 ? []
                 : [instance.loader.toLowerCase()];
-            const res = await window.electronAPI.getModVersions(project.project_id, loaders, [instance.version]);
+            const res = await window.electronAPI.getModVersions(
+                project.project_id,
+                loaders,
+                [instance.version],
+                project.curseforge_project_id || null
+            );
 
             if (!res || !res.success || !res.versions || res.versions.length === 0) {
                 addNotification("No compatible version found!", 'error');
@@ -544,10 +551,12 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
             }
             const targetVersion = res.versions[0];
             const file = targetVersion.files.find(f => f.primary) || targetVersion.files[0];
+            const installProjectId = targetVersion.project_id || project.project_id;
 
             const installRes = await window.electronAPI.installMod({
                 instanceName: instance.name,
-                projectId: project.project_id,
+                projectId: installProjectId,
+                fallbackCurseForgeProjectId: project.curseforge_project_id || null,
                 versionId: targetVersion.id,
                 filename: file.filename,
                 url: file.url,
@@ -580,7 +589,12 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
             const loaders = (project.project_type === 'resourcepack' || project.project_type === 'shader' || !instance.loader || instance.loader.toLowerCase() === 'vanilla')
                 ? []
                 : [instance.loader.toLowerCase()];
-            const res = await window.electronAPI.getModVersions(project.project_id, loaders, [instance.version]);
+            const res = await window.electronAPI.getModVersions(
+                project.project_id,
+                loaders,
+                [instance.version],
+                project.curseforge_project_id || null
+            );
             if (res && res.success && res.versions) {
                 setProjectVersions(res.versions);
             }
@@ -595,9 +609,11 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
         try {
             setInstallationStatus(prev => ({ ...prev, [selectedProject.project_id]: 'installing' }));
             const file = version.files.find(f => f.primary) || version.files[0];
+            const installProjectId = version.project_id || selectedProject.project_id;
             const installRes = await window.electronAPI.installMod({
                 instanceName: instance.name,
-                projectId: selectedProject.project_id,
+                projectId: installProjectId,
+                fallbackCurseForgeProjectId: selectedProject.curseforge_project_id || null,
                 versionId: version.id,
                 filename: file.filename,
                 url: file.url,
@@ -1262,6 +1278,9 @@ function InstanceDetails({ instance, onBack, runningInstances, onInstanceUpdate,
                                                     <div className="flex items-center gap-2">
                                                         <h3 className="font-bold text-lg text-foreground truncate">{result.title}</h3>
                                                         <span className="text-[10px] bg-background text-muted-foreground px-1.5 py-0.5 rounded border border-border">{result.project_type}</span>
+                                                        {getSourceTags(result.source, result.sources).map((sourceTag) => (
+                                                            <span key={`${result.project_id}-${sourceTag}`} className="text-[10px] bg-background text-muted-foreground px-1.5 py-0.5 rounded border border-border uppercase">{sourceTag}</span>
+                                                        ))}
                                                     </div>
                                                     <p className="text-sm text-muted-foreground line-clamp-1">{result.description}</p>
                                                     {result.project_type === 'shader' && (

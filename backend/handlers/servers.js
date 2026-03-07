@@ -1696,7 +1696,7 @@ eula=false
         }
     });
 
-    
+
     function parsePropertiesFile(content) {
         const properties = {};
         const lines = content.split('\n');
@@ -1725,7 +1725,7 @@ eula=false
         return { properties, header };
     }
 
-    
+
     function stringifyPropertiesFile(properties, header) {
         let content = header ? header + '\n' : '';
         const keys = Object.keys(properties).sort();
@@ -2050,6 +2050,8 @@ eula=false
                 return {
                     name: file.name,
                     projectId: modCache[cacheKey]?.projectId,
+                    versionId: modCache[cacheKey]?.versionId,
+                    source: modCache[cacheKey]?.source || 'modrinth',
                     title: modCache[cacheKey]?.title || file.name,
                     type: file.type
                 };

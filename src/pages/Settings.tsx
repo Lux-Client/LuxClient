@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from '../components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
+import { getSourceTags } from '../utils/sourceTags';
 import {
     Save,
     FolderOpen,
@@ -351,12 +352,10 @@ function Settings({ mode = 'default' }) {
         if (foundInSearch) {
             modName = foundInSearch.title;
         } else {
-
             try {
-                const response = await fetch(`https://api.modrinth.com/v2/project/${input}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    modName = data.title;
+                const response = await window.electronAPI.getModrinthProject(input);
+                if (response?.success && response.project?.title) {
+                    modName = response.project.title;
                 }
             } catch (err) {
                 console.error('Failed to fetch mod details:', err);
@@ -389,9 +388,17 @@ function Settings({ mode = 'default' }) {
 
         setSearchingAutoInstallMods(true);
         try {
-            const response = await fetch(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=5`);
-            const data = await response.json();
-            setAutoInstallModsSearchResults(data.hits || []);
+            const response = await window.electronAPI.searchModrinth(query, [], {
+                limit: 5,
+                projectType: 'mod',
+                includeCurseforge: true
+            });
+            if (response?.success) {
+                setAutoInstallModsSearchResults(response.results || []);
+            } else {
+                addNotification(t('settings.auto_install.search_failed'), 'error');
+                setAutoInstallModsSearchResults([]);
+            }
         } catch (err) {
             console.error('Failed to search mods:', err);
             addNotification(t('settings.auto_install.search_failed'), 'error');
@@ -400,6 +407,31 @@ function Settings({ mode = 'default' }) {
             setSearchingAutoInstallMods(false);
         }
     };
+
+    useEffect(() => {
+        const hydrateAutoInstallMetadata = async () => {
+            const entries = Array.isArray(settings.autoInstallMods) ? settings.autoInstallMods : [];
+            const missing = entries.filter((entry) => !autoInstallModsMetadata[entry]);
+            if (missing.length === 0) return;
+
+            const discovered = {};
+            await Promise.all(missing.map(async (entry) => {
+                try {
+                    const response = await window.electronAPI.getModrinthProject(entry);
+                    if (response?.success && response.project?.title) {
+                        discovered[entry] = response.project.title;
+                    }
+                } catch (_) {
+                }
+            }));
+
+            if (Object.keys(discovered).length > 0) {
+                setAutoInstallModsMetadata((prev) => ({ ...prev, ...discovered }));
+            }
+        };
+
+        hydrateAutoInstallMetadata();
+    }, [settings.autoInstallMods, autoInstallModsMetadata]);
 
     const handleCheckUpdate = async () => {
         setIsCheckingUpdate(true);
@@ -940,6 +972,13 @@ function Settings({ mode = 'default' }) {
                                                 >
                                                     <p className="font-medium text-sm text-foreground">{mod.title}</p>
                                                     <p className="text-xs text-muted-foreground truncate">{mod.project_id}</p>
+                                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                                        {getSourceTags(mod.source, mod.sources).map((sourceTag) => (
+                                                            <span key={`${mod.project_id}-${sourceTag}`} className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                                                {sourceTag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </button>
                                             ))}
                                         </div>
@@ -983,8 +1022,8 @@ function Settings({ mode = 'default' }) {
                                                 const searchQuery = autoInstallModsListSearch.toLowerCase();
                                                 return modName.toLowerCase().includes(searchQuery) || mod.toLowerCase().includes(searchQuery);
                                             }).length === 0 && (
-                                                <div className="text-center py-4 text-muted-foreground text-sm">{t('settings.auto_install.no_matches')}</div>
-                                            )}
+                                                    <div className="text-center py-4 text-muted-foreground text-sm">{t('settings.auto_install.no_matches')}</div>
+                                                )}
                                         </div>
                                     </div>
                                 ) : (
