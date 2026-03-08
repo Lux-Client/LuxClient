@@ -1,0 +1,173 @@
+name: Draft Release Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: draft-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            artifact_name: release-win
+            build_command: npx electron-builder --win nsis msi --publish never
+            cache_path_1: $LOCALAPPDATA\electron\Cache
+            cache_path_2: $LOCALAPPDATA\electron-builder\Cache
+            cache_dir_1: ELECTRON_CACHE_DIR=$LOCALAPPDATA\\electron\\Cache
+            cache_dir_2: ELECTRON_BUILDER_CACHE_DIR=$LOCALAPPDATA\\electron-builder\\Cache
+            shell: bash
+          - name: Linux
+            os: ubuntu-latest
+            artifact_name: release-linux
+            build_command: npx electron-builder --linux AppImage deb rpm --publish never
+            cache_path_1: $HOME/.cache/electron
+            cache_path_2: $HOME/.cache/electron-builder
+            cache_dir_1: ELECTRON_CACHE_DIR=$HOME/.cache/electron
+            cache_dir_2: ELECTRON_BUILDER_CACHE_DIR=$HOME/.cache/electron-builder
+            shell: bash
+          - name: macOS
+            os: macos-latest
+            artifact_name: release-mac
+            build_command: npx electron-builder --mac dmg zip --publish never
+            cache_path_1: $HOME/Library/Caches/electron
+            cache_path_2: $HOME/Library/Caches/electron-builder
+            cache_dir_1: ELECTRON_CACHE_DIR=$HOME/Library/Caches/electron
+            cache_dir_2: ELECTRON_BUILDER_CACHE_DIR=$HOME/Library/Caches/electron-builder
+            shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute build SHA
+        shell: bash
+        run: |
+          echo "BUILD_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Set Electron cache dirs
+        shell: bash
+        run: |
+          echo "${{ matrix.cache_dir_1 }}" >> "$GITHUB_ENV"
+          echo "${{ matrix.cache_dir_2 }}" >> "$GITHUB_ENV"
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ matrix.cache_path_1 }}
+            ${{ matrix.cache_path_2 }}
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Create .env file for build
+        shell: bash
+        run: |
+          echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+          echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
+          echo "DROPBOX_CLIENT_ID=${{ secrets.DROPBOX_CLIENT_ID }}" >> .env
+          echo "DROPBOX_CLIENT_SECRET=${{ secrets.DROPBOX_CLIENT_SECRET }}" >> .env
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Package application
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.build_command }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Add SHA to release filenames
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in release/*; do
+            [ -f "$f" ] || continue
+            filename="$(basename "$f")"
+            if [[ "$filename" == *.* ]]; then
+              base="${filename%.*}"
+              ext="${filename##*.}"
+              mv -f "$f" "release/${base}-${SHORT_SHA}.${ext}"
+            else
+              mv -f "$f" "release/${filename}-${SHORT_SHA}"
+            fi
+          done
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-${{ env.SHORT_SHA }}
+          path: release/
+          if-no-files-found: error
+          compression-level: 6
+
+  release:
+    name: Update draft release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Ensure draft release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="draft-build"
+          TITLE="Draft Build"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft --title "$TITLE" --target "$GITHUB_SHA"
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "$TITLE" \
+              --target "$GITHUB_SHA" \
+              --notes "Automatisch erzeugter Draft Release aus workflow_dispatch."
+          fi
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(release-assets/*)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release assets found"
+            exit 1
+          fi
+          gh release upload draft-build "${files[@]}" --clobber
