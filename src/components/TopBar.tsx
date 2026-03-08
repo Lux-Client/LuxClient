@@ -109,9 +109,9 @@ function TopBar({
   const isClientPageEnabled = isFeatureEnabled('openClientPage');
 
   return (
-    <div className="h-14 w-full titlebar flex items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md flex-none relative z-[60]">
-      <div className="flex items-center gap-2 no-drag">
-        <div className="w-8 h-8 bg-primary/15 rounded-lg flex items-center justify-center text-primary font-bold text-sm border border-primary/20">
+    <div className="h-16 w-full titlebar flex items-center justify-between px-5 border-b border-border bg-background/80 backdrop-blur-md flex-none relative z-[60]">
+      <div className="flex items-center gap-2.5 no-drag">
+        <div className="w-10 h-10 bg-primary/15 rounded-xl flex items-center justify-center text-primary font-bold text-base border border-primary/20">
           M
         </div>
 
@@ -120,20 +120,20 @@ function TopBar({
             <Button
               variant="ghost"
               size="sm"
-              className="gap-2 text-xs font-semibold text-muted-foreground h-8"
+              className="h-10 gap-2.5 rounded-xl px-3.5 text-sm font-semibold text-muted-foreground"
               onClick={() => onModeSelect(currentMode === 'launcher' ? 'server' : 'launcher')}
             >
-              <ArrowRightLeft className="h-3.5 w-3.5" />
+              <ArrowRightLeft className="h-4 w-4" />
               {currentMode === 'launcher' ? t('common.switch_to_server') : t('common.switch_to_client')}
             </Button>
 
             <Button
               variant="ghost"
               size="sm"
-              className="gap-2 text-xs font-semibold text-muted-foreground h-8"
+              className="h-10 gap-2.5 rounded-xl px-3.5 text-sm font-semibold text-muted-foreground"
               onClick={() => onNavigate('news')}
             >
-              <Newspaper className="h-3.5 w-3.5" />
+              <Newspaper className="h-4 w-4" />
               {t('common.news', 'News')}
             </Button>
           </>
@@ -144,13 +144,13 @@ function TopBar({
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 text-xs text-muted-foreground h-8 min-w-[200px] justify-start border-border/50 bg-background/50"
+          className="h-10 min-w-[280px] gap-2.5 rounded-xl border-border/50 bg-background/50 px-4 text-sm text-muted-foreground justify-start"
           onClick={onOpenCommandPalette}
           disabled={!isCommandPaletteAvailable}
         >
-          <Search className="h-3.5 w-3.5" />
+          <Search className="h-4 w-4" />
           <span>{t('dashboard.search_placeholder', 'Search...')}</span>
-          <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          <kbd className="ml-auto pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded-md border border-border bg-muted px-2 font-mono text-[11px] font-medium text-muted-foreground">
             Ctrl+K
           </kbd>
         </Button>
@@ -163,13 +163,13 @@ function TopBar({
         {activeDownloadCount > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2 h-8 text-xs">
-                <Download className="h-3.5 w-3.5 text-primary animate-pulse" />
+              <Button variant="ghost" size="sm" className="h-10 gap-2 rounded-xl px-3 text-sm">
+                <Download className="h-4 w-4 text-primary animate-pulse" />
                 <span className="tabular-nums">
                   {Math.round(activeDownloadEntries.reduce((t, [, d]) => t + ((d as any)?.progress || 0), 0) / activeDownloadCount)}%
                 </span>
                 {activeDownloadCount > 1 && (
-                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">{activeDownloadCount}</Badge>
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[11px]">{activeDownloadCount}</Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
@@ -195,10 +195,10 @@ function TopBar({
           <Button
             variant={currentMode === 'client' ? 'default' : 'ghost'}
             size="sm"
-            className="gap-2 h-8 text-xs"
+            className="h-10 gap-2.5 rounded-xl px-3.5 text-sm"
             onClick={() => onModeSelect('client')}
           >
-            <Gamepad2 className="h-3.5 w-3.5" />
+            <Gamepad2 className="h-4 w-4" />
             {t('client_page.title', 'Open Client')}
           </Button>
         )}
@@ -206,7 +206,7 @@ function TopBar({
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 h-8 text-xs"
+          className="h-10 gap-2 rounded-xl px-3 text-sm"
         >
           <div className={cn('w-1.5 h-1.5 rounded-full', runningCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/50')} />
           <span className="text-muted-foreground">
@@ -220,10 +220,10 @@ function TopBar({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-10 w-10 rounded-xl p-0"
                 onClick={() => setActionBarOpen(true)}
               >
-                <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                <Zap className="h-4 w-4 text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
@@ -232,30 +232,30 @@ function TopBar({
           </Tooltip>
         </TooltipProvider>
 
-        <Separator orientation="vertical" className="h-5" />
+        <Separator orientation="vertical" className="h-6" />
 
         <DropdownMenu onOpenChange={(open) => open && loadAccounts()}>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-accent transition-colors">
+            <button className="flex h-10 items-center gap-2 rounded-xl px-2.5 py-1.5 hover:bg-accent transition-colors">
               {userProfile ? (
                 <>
                   <PlayerHead
                     src={liveSkin}
                     uuid={userProfile?.uuid}
                     name={userProfile?.name}
-                    size={24}
+                    size={28}
                     className="rounded-md"
                   />
-                  <span className="text-xs font-medium text-foreground hidden sm:inline max-w-[80px] truncate">
+                  <span className="hidden max-w-[96px] truncate text-sm font-medium text-foreground sm:inline">
                     {userProfile?.name}
                   </span>
                 </>
               ) : (
-                <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center">
-                  <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+                  <UserPlus className="h-4 w-4 text-muted-foreground" />
                 </div>
               )}
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
