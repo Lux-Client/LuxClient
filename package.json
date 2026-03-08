@@ -93,6 +93,7 @@
         "rpm"
       ],
       "category": "Game",
+      "icon": "resources/icon.png",
       "executableName": "mclc",
       "artifactName": "${productName}-setup.${ext}"
     }
