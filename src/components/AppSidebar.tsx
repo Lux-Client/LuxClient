@@ -32,7 +32,7 @@ function AppSidebar({
       try {
         const res = await window.electronAPI.getSettings();
         if (res.success) setSettings(res.settings);
-      } catch (e) {}
+      } catch (e) { }
     };
     loadSettings();
     const cleanupSettings = window.electronAPI.onSettingsUpdated?.((s) => setSettings(s));
@@ -53,7 +53,7 @@ function AppSidebar({
           .slice(0, 3);
         setRecentInstances(recent);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const launcherItems: { id: string; label: string; icon: any; disabled?: boolean }[] = [
@@ -136,7 +136,7 @@ function AppSidebar({
       <button
         onClick={() => !item.disabled && setView(item.id)}
         className={cn(
-          'group relative flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium',
+          'group relative flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium outline-none focus:outline-none focus-visible:outline-none',
           layoutTransitionClass,
           isCollapsed ? 'px-2' : 'px-3',
           isActive
@@ -166,7 +166,7 @@ function AppSidebar({
       <button
         onClick={onClick}
         className={cn(
-          'group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium',
+          'group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium outline-none focus:outline-none focus-visible:outline-none',
           layoutTransitionClass,
           isCollapsed ? 'px-2' : 'px-3',
           destructive
@@ -193,11 +193,11 @@ function AppSidebar({
           isCollapsed ? 'w-[var(--sidebar-width)]' : 'w-[var(--sidebar-width-expanded)]'
         )}
       >
-        <div className="relative h-12 shrink-0">
+        <div className="relative h-14 shrink-0">
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={cn(
-              'sidebar-toggle-transition absolute top-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground -translate-y-1/2',
+              'sidebar-toggle-transition absolute top-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground -translate-y-1/2 outline-none focus:outline-none focus-visible:outline-none',
               isCollapsed ? 'right-3.5' : 'right-3'
             )}
           >
@@ -235,7 +235,7 @@ function AppSidebar({
                       key={inst.name}
                       onClick={() => onInstanceClick && onInstanceClick(inst)}
                       className={cn(
-                        'group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        'group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground outline-none focus:outline-none focus-visible:outline-none',
                         layoutTransitionClass,
                         isCollapsed ? 'px-2' : 'px-3'
                       )}
@@ -271,7 +271,7 @@ function AppSidebar({
                 <button
                   onClick={() => onCreateInstance && onCreateInstance()}
                   className={cn(
-                    'group flex h-10 w-full items-center overflow-hidden rounded-xl text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10',
+                    'group flex h-10 w-full items-center overflow-hidden rounded-xl text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 outline-none focus:outline-none focus-visible:outline-none',
                     layoutTransitionClass,
                     isCollapsed ? 'px-2' : 'px-3'
                   )}

@@ -109,7 +109,7 @@ function TopBar({
   const isClientPageEnabled = isFeatureEnabled('openClientPage');
 
   return (
-    <div className="h-12 w-full titlebar flex items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md flex-none relative z-[60]">
+    <div className="h-14 w-full titlebar flex items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md flex-none relative z-[60]">
       <div className="flex items-center gap-2 no-drag">
         <div className="w-8 h-8 bg-primary/15 rounded-lg flex items-center justify-center text-primary font-bold text-sm border border-primary/20">
           M
