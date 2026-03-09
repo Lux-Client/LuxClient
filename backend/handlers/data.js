@@ -43,7 +43,7 @@ module.exports = (ipcMain) => {
     });
     ipcMain.handle('data:get-news', async () => {
         try {
-            const NEWS_URL = 'https://mclc.pluginhub.de/news.json';
+            const NEWS_URL = 'https://lux.pluginhub.de/news.json';
 
             console.log(`[News] Fetching from ${NEWS_URL}...`);
             const response = await axios.get(NEWS_URL, { timeout: 30000 });

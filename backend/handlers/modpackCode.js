@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { app } = require('electron');
 const { installModInternal } = require('./modrinth');
-const SERVER_URL = 'https://mclc.pluginhub.de';
+const SERVER_URL = 'https://lux.pluginhub.de';
 
 console.log('[ModpackCode-Handler] 🔧 Modul wird geladen...');
 
@@ -219,7 +219,7 @@ module.exports = (ipcMain, win) => {
             const resolveModrinthDownloadUrl = async (versionId, expectedFileName) => {
                 try {
                     const versionRes = await axios.get(`https://api.modrinth.com/v2/version/${versionId}`, {
-                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                         timeout: 10000
                     });
                     const versionData = versionRes.data;

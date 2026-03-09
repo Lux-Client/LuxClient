@@ -7,9 +7,9 @@ if (process.platform === 'linux' && process.env.XDG_CURRENT_DESKTOP === 'COSMIC'
     process.env.XDG_CURRENT_DESKTOP = 'Unity';
 }
 
-app.setName(pkg.productName || 'MCLC');
+app.setName(pkg.productName || 'Lux');
 app.setAboutPanelOptions({
-    applicationName: pkg.productName || 'MCLC',
+    applicationName: pkg.productName || 'Lux',
     applicationVersion: pkg.version
 });
 
@@ -131,11 +131,11 @@ async function checkAndLaunch() {
             const { compareVersions } = require('../backend/utils/version-utils');
             const pkg = require('../package.json');
 
-            const REPO = 'MCLC-Client/MCLC-Client';
+            const REPO = 'LuxClient/LuxClient';
             const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
             const response = await axios.get(GITHUB_API, {
-                headers: { 'User-Agent': 'MCLC-AutoUpdater' }
+                headers: { 'User-Agent': 'Lux-AutoUpdater' }
             });
             const release = response.data;
             const latestVersion = release.tag_name;
@@ -201,7 +201,7 @@ objShell.Run """" & WScript.Arguments(1) & """", 1, False`;
                             spawn('wscript.exe', [updateScript, targetPath, exeTarget], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
                         } else if (process.platform === 'linux') {
                             if (safeAssetName.endsWith('.AppImage')) {
-                                const safeUpdatePath = path.join(downloadDir, 'mclc-setup.AppImage');
+                                const safeUpdatePath = path.join(downloadDir, 'lux-setup.AppImage');
                                 fs.renameSync(targetPath, safeUpdatePath);
                                 fs.chmodSync(safeUpdatePath, 0o755);
                                 spawn(safeUpdatePath, [], { detached: true, stdio: 'ignore' }).unref();
@@ -247,7 +247,7 @@ function createWindow() {
         height: 900,
         minWidth: 900,
         minHeight: 600,
-        title: 'MCLC',
+        title: 'Lux',
         frame: false,
         icon: path.join(__dirname, '../resources/icon.png'),
         backgroundColor: '#121212',
@@ -605,7 +605,7 @@ app.whenReady().then(() => {
                 }
             }
         ]);
-        tray.setToolTip('MCLC');
+        tray.setToolTip('Lux');
         tray.setContextMenu(contextMenu);
         tray.on('click', () => {
             if (mainWindow) {

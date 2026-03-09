@@ -303,7 +303,7 @@ class CloudBackupHandler {
 
         try {
             if (providerId === 'GOOGLE_DRIVE') {
-                const rootFolderId = await this.getOrCreateFolder(providerId, 'MCLC_Backups');
+                const rootFolderId = await this.getOrCreateFolder(providerId, 'Lux_Backups');
                 const instanceFolderId = await this.getOrCreateFolder(providerId, instanceName, rootFolderId);
                 const fileContent = await fs.readFile(filePath);
 
@@ -339,7 +339,7 @@ class CloudBackupHandler {
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                         'Dropbox-API-Arg': JSON.stringify({
-                            path: `/MCLC_Backups/${instanceName}/${fileName}`,
+                            path: `/Lux_Backups/${instanceName}/${fileName}`,
                             mode: 'overwrite',
                             autorename: true,
                             mute: false
@@ -372,7 +372,7 @@ class CloudBackupHandler {
 
         try {
             if (providerId === 'GOOGLE_DRIVE') {
-                const rootFolderId = await this.getOrCreateFolder(providerId, 'MCLC_Backups');
+                const rootFolderId = await this.getOrCreateFolder(providerId, 'Lux_Backups');
                 const instanceFolderId = await this.getOrCreateFolder(providerId, instanceName, rootFolderId);
 
                 const q = instanceFolderId
@@ -390,7 +390,7 @@ class CloudBackupHandler {
                 return { success: true, files: res.data.files };
             } else if (providerId === 'DROPBOX') {
                 const res = await axios.post('https://api.dropboxapi.com/2/files/list_folder', {
-                    path: `/MCLC_Backups/${instanceName}`,
+                    path: `/Lux_Backups/${instanceName}`,
                     recursive: false
                 }, {
                     headers: { Authorization: `Bearer ${accessToken}` }

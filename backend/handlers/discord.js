@@ -69,7 +69,7 @@ const stopRPC = async () => {
     }
 };
 
-const setActivity = (details, state, largeImageKey = 'mclc_icon', largeImageText = 'MCLC', startTimestamp = null) => {
+const setActivity = (details, state, largeImageKey = 'lux_icon', largeImageText = 'Lux', startTimestamp = null) => {
     if (!isEnabled || !rpc || !isReady) return;
 
     try {

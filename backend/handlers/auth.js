@@ -82,11 +82,11 @@ module.exports = (ipcMain, mainWindow) => {
                 uuid = token.uuid;
                 accessToken = token.mcToken || token.access_token;
             } else {
-                const mclcAuth = token.mclc ? token.mclc() : null;
-                if (mclcAuth) {
-                    name = mclcAuth.name;
-                    uuid = mclcAuth.uuid;
-                    accessToken = mclcAuth.access_token;
+                const luxAuth = token.lux ? token.lux() : null;
+                if (luxAuth) {
+                    name = luxAuth.name;
+                    uuid = luxAuth.uuid;
+                    accessToken = luxAuth.access_token;
                 } else {
                     throw new Error("Unable to parse authentication token");
                 }

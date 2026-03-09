@@ -342,7 +342,7 @@ async function installForgeLoader(instanceDir, mcVersion, loaderVersion, onProgr
             return { success: false, error: `Forge installation failed: ${e.message}` };
         }
 
-        console.log('Extracting version.json for MCLC compatibility...');
+        console.log('Extracting version.json for Lux compatibility...');
         if (onProgress) onProgress(80, 'Extracting version profile...');
         const versionProfile = await extractVersionUid(installerPath);
 
@@ -394,7 +394,7 @@ async function installNeoForgeLoader(instanceDir, mcVersion, loaderVersion, onPr
             return { success: false, error: `NeoForge installation failed: ${e.message}` };
         }
 
-        console.log('Extracting version.json for MCLC compatibility...');
+        console.log('Extracting version.json for Lux compatibility...');
         const versionProfile = await extractVersionUid(installerPath);
 
         if (!versionProfile) {
@@ -919,7 +919,7 @@ module.exports = (ipcMain, win) => {
                                                     index: 0
                                                 },
                                                 headers: {
-                                                    'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)'
+                                                    'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)'
                                                 }
                                             }
                                         );
@@ -1293,7 +1293,7 @@ module.exports = (ipcMain, win) => {
                                 if (signal.aborted) throw new Error('Installation aborted');
                                 try {
                                     const fileRes = await axios.get(`https://api.curse.tools/v1/cf/mods/${mod.projectID}/files/${mod.fileID}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0' },
                                         signal: signal
                                     });
                                     const fileData = fileRes.data.data;
@@ -1354,7 +1354,7 @@ module.exports = (ipcMain, win) => {
                     filters: [
                         { name: 'Modpacks', extensions: ['mrpack', 'mcpack', 'zip'] },
                         { name: 'Modrinth Modpack', extensions: ['mrpack'] },
-                        { name: 'MCLC Modpack', extensions: ['mcpack'] },
+                        { name: 'Lux Modpack', extensions: ['mcpack'] },
                         { name: 'Curseforge Modpack', extensions: ['zip'] }
                     ],
                     properties: ['openFile']
@@ -1450,7 +1450,7 @@ module.exports = (ipcMain, win) => {
                                     modCache[cacheKey] = { title, icon, version, projectId, versionId, hash };
                                 } else {
                                     const res = await axios.get(`https://api.modrinth.com/v2/version_file/${hash}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                         timeout: 3000
                                     });
                                     const versionData = res.data;
@@ -1458,7 +1458,7 @@ module.exports = (ipcMain, win) => {
                                     const projectId = versionData.project_id;
 
                                     const projectRes = await axios.get(`https://api.modrinth.com/v2/project/${projectId}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                         timeout: 3000
                                     });
                                     const projectData = projectRes.data;
@@ -1545,7 +1545,7 @@ module.exports = (ipcMain, win) => {
                                     modCache[cacheKey] = { title, icon, version, projectId, versionId, hash };
                                 } else {
                                     const res = await axios.get(`https://api.modrinth.com/v2/version_file/${hash}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                         timeout: 3000
                                     });
                                     const versionData = res.data;
@@ -1553,7 +1553,7 @@ module.exports = (ipcMain, win) => {
                                     const projectId = versionData.project_id;
 
                                     const projectRes = await axios.get(`https://api.modrinth.com/v2/project/${projectId}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                         timeout: 3000
                                     });
                                     const projectData = projectRes.data;
@@ -2361,7 +2361,7 @@ module.exports = (ipcMain, win) => {
                                     cacheUpdates[cacheKey] = entry;
                                 } else {
                                     const res = await axios.get(`https://api.modrinth.com/v2/version_file/${hash}`, {
-                                        headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                        headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                         timeout: 3000
                                     });
                                     const versionData = res.data;
@@ -2369,7 +2369,7 @@ module.exports = (ipcMain, win) => {
                                     if (versionData && versionData.project_id) {
 
                                         const projectRes = await axios.get(`https://api.modrinth.com/v2/project/${versionData.project_id}`, {
-                                            headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                            headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                             timeout: 3000
                                         });
                                         const projectData = projectRes.data;
@@ -2497,7 +2497,7 @@ module.exports = (ipcMain, win) => {
                                     pageSize: 100,
                                     index: 0
                                 },
-                                headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                                headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                                 timeout: 5000
                             });
 
@@ -2541,7 +2541,7 @@ module.exports = (ipcMain, win) => {
 
                         const response = await axios.get(`https://api.modrinth.com/v2/project/${normalizedProjectId}/version`, {
                             params,
-                            headers: { 'User-Agent': 'Client/MCLC/1.0 (fernsehheft@pluginhub.de)' },
+                            headers: { 'User-Agent': 'Client/Lux/1.0 (fernsehheft@pluginhub.de)' },
                             timeout: 5000
                         });
 
@@ -2615,7 +2615,7 @@ module.exports = (ipcMain, win) => {
             console.log(`[Modpack:Install] ICON_URL: ${iconUrl}`);
             console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
             try {
-                const tempPath = path.join(os.tmpdir(), `mclc-modpack-${Date.now()}.mrpack`);
+                const tempPath = path.join(os.tmpdir(), `lux-modpack-${Date.now()}.mrpack`);
                 if (win && win.webContents) {
                     win.webContents.send('install:progress', { instanceName: name, progress: 1, status: 'Downloading Modpack...' });
                 }

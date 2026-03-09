@@ -19,7 +19,7 @@ function createWindow() {
         height: 720,
         minWidth: 900,
         minHeight: 600,
-        title: 'MCLC Launcher',
+        title: 'Lux Launcher',
         frame: false,
         backgroundColor: '#121212',
         webPreferences: {

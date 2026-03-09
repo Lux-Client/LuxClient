@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const localesDir = 'c:/Users/beatv/Documents/GitHub/MCLC-Client/src/locales';
+const localesDir = 'c:/Users/beatv/Documents/GitHub/LuxClient/src/locales';
 
 const translations = {
     en: {

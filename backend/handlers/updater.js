@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const { compareVersions } = require('../utils/version-utils');
 const pkg = require('../../package.json');
 
-const REPO = 'MCLC-Client/MCLC-Client';
+const REPO = 'LuxClient/LuxClient';
 const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 module.exports = (ipcMain, mainWindow) => {
@@ -16,7 +16,7 @@ module.exports = (ipcMain, mainWindow) => {
         try {
             console.log(`[Updater] Checking for updates... (Current: ${testVersionOverride || pkg.version})`);
             const response = await axios.get(GITHUB_API, {
-                headers: { 'User-Agent': 'MCLC-AutoUpdater' }
+                headers: { 'User-Agent': 'Lux-AutoUpdater' }
             });
 
             const release = response.data;

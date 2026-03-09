@@ -114,14 +114,14 @@ Add-Type -TypeDefinition $code -Language CSharp
             "-XX:G1NewSizePercent=20",
             "-XX:G1MaxNewSizePercent=30",
             "-XX:G1ReservePercent=15",
-            "-Dmclc.profile=low-end"
+            "-Dlux.profile=low-end"
         ];
 
         const zgcFlags = [
             "-XX:+UseZGC",
             "-XX:+ZGenerational",
             "-XX:+UnlockExperimentalVMOptions",
-            "-Dmclc.profile=zgc"
+            "-Dlux.profile=zgc"
         ];
 
         if (profile === 'performance') return aikarsFlags;
@@ -464,9 +464,9 @@ Add-Type -TypeDefinition $code -Language CSharp
             }
 
             if (!opts.customArgs) opts.customArgs = [];
-            opts.customArgs.push(`-Dorg.lwjgl.opengl.Window.name=MCLC Client ${config.version || ''}`);
-            opts.customArgs.push(`-Dorg.lwjgl.Display.title=MCLC Client ${config.version || ''}`);
-            opts.version.type = "MCLC Client";
+            opts.customArgs.push(`-Dorg.lwjgl.opengl.Window.name=Lux Client ${config.version || ''}`);
+            opts.customArgs.push(`-Dorg.lwjgl.Display.title=Lux Client ${config.version || ''}`);
+            opts.version.type = "Lux Client";
 
             if (config.loader && config.loader.toLowerCase() !== 'vanilla') {
                 if (!config.versionId) {
@@ -507,7 +507,7 @@ Add-Type -TypeDefinition $code -Language CSharp
 
             try {
                 const discord = require('./discord');
-                discord.setActivity(`Playing ${instanceName}`, 'Starting Game...', 'mclc_icon', 'MCLC', runningInstances.get(instanceName));
+                discord.setActivity(`Playing ${instanceName}`, 'Starting Game...', 'lux_icon', 'Lux', runningInstances.get(instanceName));
             } catch (e) {
                 console.error('[Launcher] Failed to update Discord activity on start:', e.message);
             }
@@ -639,7 +639,7 @@ Add-Type -TypeDefinition $code -Language CSharp
 
                 try {
                     const discord = require('./discord');
-                    discord.setActivity('In Launcher', 'Idle', 'mclc_icon', 'MCLC');
+                    discord.setActivity('In Launcher', 'Idle', 'lux_icon', 'Lux');
                 } catch (e) {
                     console.error('[Launcher] Failed to restore Discord activity after close:', e.message);
                 }
@@ -680,14 +680,14 @@ Add-Type -TypeDefinition $code -Language CSharp
                 const proc = await launcher.launch(opts);
                 if (proc && proc.pid) {
                     childProcesses.set(instanceName, proc);
-                    setWindowTitle(proc.pid, `MCLC Client ${opts.version.number}`);
+                    setWindowTitle(proc.pid, `Lux Client ${opts.version.number}`);
 
                     if (settings.minimalMode && process.platform === 'win32' && mainWindow) {
                         console.log('[Launcher] Minimal Mode enabled, minimizing window.');
                         mainWindow.minimize();
                     }
                 } else {
-                    console.error('[Launcher] Launch failed: No valid process returned from MCLC.', proc);
+                    console.error('[Launcher] Launch failed: No valid process returned from Lux.', proc);
                     runningInstances.delete(instanceName);
                     activeLaunches.delete(instanceName);
                     liveLogs.delete(instanceName);
