@@ -35,84 +35,126 @@ const PRESETS = [
     primary: "#e26602",
     bg: "#111111",
     surface: "#1c1c1c",
+    textOnBackground: "#f5f5f5",
+    textOnSurface: "#f5f5f5",
+    textOnPrimary: "#1a1208",
   },
   {
     name: "Light Lux",
     primary: "#d24e01",
     bg: "#f9ddb1",
     surface: "#f5c77e",
+    textOnBackground: "#2a1a0e",
+    textOnSurface: "#2c1b0f",
+    textOnPrimary: "#fff4ea",
   },
   {
     name: "Emerald",
     primary: "#1bd96a",
     bg: "#111111",
     surface: "#1c1c1c",
+    textOnBackground: "#ecfff5",
+    textOnSurface: "#e8fff3",
+    textOnPrimary: "#062012",
   },
   {
     name: "Ruby",
     primary: "#ff5c6c",
     bg: "#140a0c",
     surface: "#1f1114",
+    textOnBackground: "#ffecef",
+    textOnSurface: "#ffe8ec",
+    textOnPrimary: "#2a0b11",
   },
   {
     name: "Sapphire",
     primary: "#3da9fc",
     bg: "#0b1220",
     surface: "#121a2b",
+    textOnBackground: "#eaf3ff",
+    textOnSurface: "#e5f0ff",
+    textOnPrimary: "#081a2b",
   },
   {
     name: "Amethyst",
     primary: "#b388ff",
     bg: "#14121c",
     surface: "#1c1826",
+    textOnBackground: "#f2eaff",
+    textOnSurface: "#eee4ff",
+    textOnPrimary: "#1f1433",
   },
   {
     name: "Ocean",
     primary: "#00e0c6",
     bg: "#071418",
     surface: "#0f1f24",
+    textOnBackground: "#dcfffa",
+    textOnSurface: "#d7fff9",
+    textOnPrimary: "#04221e",
   },
   {
     name: "Sunset",
     primary: "#ff8a5b",
     bg: "#1a0f0a",
     surface: "#241611",
+    textOnBackground: "#fff0e9",
+    textOnSurface: "#ffebe3",
+    textOnPrimary: "#311204",
   },
   {
     name: "Cyberpunk",
     primary: "#f3e600",
     bg: "#1a0033",
     surface: "#2d004d",
+    textOnBackground: "#f7eeff",
+    textOnSurface: "#f3e7ff",
+    textOnPrimary: "#1d1a00",
   },
   {
     name: "Frost",
     primary: "#a5f3fc",
     bg: "#0f172a",
     surface: "#1e293b",
+    textOnBackground: "#e8f4ff",
+    textOnSurface: "#e4f0ff",
+    textOnPrimary: "#082027",
   },
   {
     name: "Autumn",
     primary: "#fb923c",
     bg: "#1c1917",
     surface: "#292524",
+    textOnBackground: "#fff3eb",
+    textOnSurface: "#ffefe7",
+    textOnPrimary: "#2f1503",
   },
   {
     name: "Midnight",
     primary: "#3b82f6",
     bg: "#000000",
     surface: "#111111",
+    textOnBackground: "#eaf2ff",
+    textOnSurface: "#edf3ff",
+    textOnPrimary: "#081a38",
   },
   {
     name: "Candy",
     primary: "#f472b6",
     bg: "#1e1b4b",
     surface: "#312e81",
+    textOnBackground: "#f8f1ff",
+    textOnSurface: "#f6eeff",
+    textOnPrimary: "#2f0b23",
   },
   {
     name: "Gold",
     primary: "#fbbf24",
     bg: "#171717",
     surface: "#262626",
+    textOnBackground: "#fff7e6",
+    textOnSurface: "#fff4e0",
+    textOnPrimary: "#2e2100",
   },
 ];
 
@@ -133,6 +175,9 @@ const DEFAULT_THEME = {
   primaryColor: "#e26602",
   backgroundColor: "#111111",
   surfaceColor: "#1c1c1c",
+  textOnBackground: "#fafafa",
+  textOnSurface: "#fafafa",
+  textOnPrimary: "#0d0d0d",
   glassBlur: 10,
   glassOpacity: 0.8,
   consoleOpacity: 0.8,
@@ -204,6 +249,9 @@ function Styling() {
           root.style.setProperty("--primary-color", t.primaryColor);
           root.style.setProperty("--background-color", t.backgroundColor);
           root.style.setProperty("--surface-color", t.surfaceColor);
+          root.style.setProperty("--text-on-background", t.textOnBackground ?? "#fafafa");
+          root.style.setProperty("--text-on-surface", t.textOnSurface ?? "#fafafa");
+          root.style.setProperty("--text-on-primary", t.textOnPrimary ?? "#0d0d0d");
           root.style.setProperty("--glass-blur", `${t.glassBlur}px`);
           root.style.setProperty("--glass-opacity", t.glassOpacity);
           root.style.setProperty("--console-opacity", t.consoleOpacity ?? 0.8);
@@ -297,6 +345,9 @@ function Styling() {
       primary: theme.primaryColor,
       bg: theme.backgroundColor,
       surface: theme.surfaceColor,
+      textOnBackground: theme.textOnBackground,
+      textOnSurface: theme.textOnSurface,
+      textOnPrimary: theme.textOnPrimary,
       sidebarGlow: theme.sidebarGlow,
       globalGlow: theme.globalGlow,
       panelOpacity: theme.panelOpacity,
@@ -329,6 +380,9 @@ function Styling() {
       primaryColor: p.primary,
       backgroundColor: p.bg,
       surfaceColor: p.surface,
+      textOnBackground: p.textOnBackground ?? theme.textOnBackground,
+      textOnSurface: p.textOnSurface ?? theme.textOnSurface,
+      textOnPrimary: p.textOnPrimary ?? theme.textOnPrimary,
       sidebarGlow: p.sidebarGlow ?? theme.sidebarGlow,
       globalGlow: p.globalGlow ?? theme.globalGlow,
       panelOpacity: p.panelOpacity ?? theme.panelOpacity,
@@ -378,6 +432,9 @@ function Styling() {
     root.style.setProperty("--primary-color", t.primaryColor);
     root.style.setProperty("--background-color", t.backgroundColor);
     root.style.setProperty("--surface-color", t.surfaceColor);
+    root.style.setProperty("--text-on-background", t.textOnBackground ?? "#fafafa");
+    root.style.setProperty("--text-on-surface", t.textOnSurface ?? "#fafafa");
+    root.style.setProperty("--text-on-primary", t.textOnPrimary ?? "#0d0d0d");
     root.style.setProperty("--glass-blur", `${t.glassBlur}px`);
     root.style.setProperty("--glass-opacity", t.glassOpacity);
     root.style.setProperty("--console-opacity", t.consoleOpacity ?? 0.8);
@@ -577,6 +634,22 @@ function Styling() {
                       label={t('styling.panels')}
                       value={theme.surfaceColor}
                       onChange={(val) => handleUpdate("surfaceColor", val)}
+                    />
+                    <Separator />
+                    <ColorPicker
+                      label={t('styling.text_on_background', 'Text on Background')}
+                      value={theme.textOnBackground}
+                      onChange={(val) => handleUpdate("textOnBackground", val)}
+                    />
+                    <ColorPicker
+                      label={t('styling.text_on_surface', 'Text on Surface')}
+                      value={theme.textOnSurface}
+                      onChange={(val) => handleUpdate("textOnSurface", val)}
+                    />
+                    <ColorPicker
+                      label={t('styling.text_on_primary', 'Text on Primary')}
+                      value={theme.textOnPrimary}
+                      onChange={(val) => handleUpdate("textOnPrimary", val)}
                     />
                   </CardContent>
                 </Card>

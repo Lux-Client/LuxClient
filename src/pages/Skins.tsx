@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SkinViewer, WalkingAnimation, IdleAnimation } from 'skinview3d';
+import * as THREE from 'three';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 import PageContent from '../components/layout/PageContent';
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '../components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { Separator } from '../components/ui/separator';
-import { Plus, Trash2, Pencil, Pause, Play, X, AlertTriangle, Loader2, User, Crown, ImageUp, Link2, Download } from 'lucide-react';
+import { Plus, Trash2, Pencil, Pause, Play, X, AlertTriangle, Loader2, User, Crown, ImageUp, Link2, Download, Paintbrush, Eraser, Save } from 'lucide-react';
 
 const DEFAULT_SKINS = [
     { name: 'Steve', defaultModel: 'classic', urls: { classic: '/assets/skins/steve-classic.png', slim: '/assets/skins/steve-slim.png' } },
@@ -178,6 +179,766 @@ const CapePreview = ({ src, className }: { src?: any; className?: string }) => {
     return <canvas ref={canvasRef} className={`w-full h-full object-contain image-pixelated ${className}`} />;
 };
 
+const AdvancedSkinEditorDialog = ({
+    open,
+    onOpenChange,
+    skinSrc,
+    model,
+    onSave,
+    onNotify,
+    t
+}) => {
+    const viewerCanvasRef = useRef(null);
+    const viewerContainerRef = useRef(null);
+    const textureLargeCanvasRef = useRef(null);
+    const textureCanvasRef = useRef(null);
+    const viewerRef = useRef(null);
+    const raycasterRef = useRef(new THREE.Raycaster());
+    const pointerVectorRef = useRef(new THREE.Vector2());
+    const pointerDownRef = useRef(false);
+    const strokeActiveRef = useRef(false);
+    const meshesRef = useRef<any[]>([]);
+    const syncScheduledRef = useRef(false);
+    const lastPointerRef = useRef({ x: -1, y: -1 });
+    const historyRef = useRef<ImageData[]>([]);
+    const historyIndexRef = useRef(-1);
+    const toolRef = useRef<'paint' | 'erase' | 'fill'>('paint');
+    const brushColorRef = useRef('#ff6600');
+    const brushSizeRef = useRef(1);
+    const mirrorModeRef = useRef<'none' | 'x' | 'y' | 'xy'>('none');
+    const activeLargeViewRef = useRef<'player' | 'texture'>('player');
+
+    const [editorModel, setEditorModel] = useState(model || 'classic');
+    const [brushColor, setBrushColor] = useState('#ff6600');
+    const [brushSize, setBrushSize] = useState(1);
+    const [tool, setTool] = useState<'paint' | 'erase' | 'fill'>('paint');
+    const [mirrorMode, setMirrorMode] = useState<'none' | 'x' | 'y' | 'xy'>('none');
+    const [activeLargeView, setActiveLargeView] = useState<'player' | 'texture'>('player');
+    const [pose, setPose] = useState('t_pose');
+    const [flatPreview, setFlatPreview] = useState('');
+    const [skinName, setSkinName] = useState('Edited Skin');
+    const [isSaving, setIsSaving] = useState(false);
+    const [, setHistoryVersion] = useState(0);
+
+    useEffect(() => {
+        if (!open) return;
+        setEditorModel(model || 'classic');
+        setActiveLargeView('player');
+        setPose('t_pose');
+    }, [model, open]);
+
+    useEffect(() => {
+        toolRef.current = tool;
+    }, [tool]);
+
+    useEffect(() => {
+        brushColorRef.current = brushColor;
+    }, [brushColor]);
+
+    useEffect(() => {
+        brushSizeRef.current = brushSize;
+    }, [brushSize]);
+
+    useEffect(() => {
+        mirrorModeRef.current = mirrorMode;
+    }, [mirrorMode]);
+
+    useEffect(() => {
+        activeLargeViewRef.current = activeLargeView;
+    }, [activeLargeView]);
+
+    const cloneImageData = (imageData) => {
+        return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    };
+
+    const updateHistoryState = () => {
+        setHistoryVersion(prev => prev + 1);
+    };
+
+    const resetHistory = () => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return;
+        const ctx = textureCanvas.getContext('2d');
+        const snapshot = cloneImageData(ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height));
+        historyRef.current = [snapshot];
+        historyIndexRef.current = 0;
+        updateHistoryState();
+    };
+
+    const pushHistorySnapshot = () => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return;
+        const ctx = textureCanvas.getContext('2d');
+        const snapshot = cloneImageData(ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height));
+        const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+        nextHistory.push(snapshot);
+        if (nextHistory.length > 80) {
+            nextHistory.shift();
+        }
+        historyRef.current = nextHistory;
+        historyIndexRef.current = nextHistory.length - 1;
+        updateHistoryState();
+    };
+
+    const renderTextureLargeCanvas = () => {
+        const source = textureCanvasRef.current;
+        const target = textureLargeCanvasRef.current;
+        if (!source || !target) return;
+        const rect = target.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(rect.width));
+        const height = Math.max(1, Math.floor(rect.height));
+        if (target.width !== width || target.height !== height) {
+            target.width = width;
+            target.height = height;
+        }
+        const ctx = target.getContext('2d');
+        ctx.clearRect(0, 0, target.width, target.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(source, 0, 0, target.width, target.height);
+    };
+
+    const applyPose = () => {
+        const viewer = viewerRef.current;
+        if (!viewer?.playerObject?.skin) return;
+        const skin = viewer.playerObject.skin;
+        const body = skin.body;
+        const head = skin.head;
+        const leftArm = skin.leftArm;
+        const rightArm = skin.rightArm;
+        const leftLeg = skin.leftLeg;
+        const rightLeg = skin.rightLeg;
+
+        [body, head, leftArm, rightArm, leftLeg, rightLeg].forEach((part) => {
+            if (!part) return;
+            part.rotation.x = 0;
+            part.rotation.y = 0;
+            part.rotation.z = 0;
+        });
+
+        if (!leftArm || !rightArm || !leftLeg || !rightLeg || !body || !head) return;
+
+        switch (pose) {
+            case 'idle':
+                rightArm.rotation.x = -0.12;
+                leftArm.rotation.x = 0.1;
+                rightLeg.rotation.x = 0.06;
+                leftLeg.rotation.x = -0.06;
+                break;
+            case 'wave':
+                rightArm.rotation.x = -1.35;
+                rightArm.rotation.z = -0.2;
+                leftArm.rotation.x = 0.15;
+                head.rotation.y = -0.15;
+                break;
+            case 'hero':
+                rightArm.rotation.x = -2.2;
+                leftArm.rotation.x = -0.2;
+                rightLeg.rotation.x = 0.1;
+                leftLeg.rotation.x = -0.05;
+                head.rotation.y = 0.12;
+                break;
+            case 'sneak':
+                body.rotation.x = 0.5;
+                head.rotation.x = -0.5;
+                rightArm.rotation.x = 0.25;
+                leftArm.rotation.x = 0.25;
+                rightLeg.rotation.x = -0.45;
+                leftLeg.rotation.x = -0.45;
+                break;
+            case 'cross':
+                rightArm.rotation.z = -1.2;
+                leftArm.rotation.z = 1.2;
+                rightArm.rotation.x = -0.2;
+                leftArm.rotation.x = -0.2;
+                break;
+            case 't_pose':
+            default:
+                rightArm.rotation.z = -Math.PI / 2;
+                leftArm.rotation.z = Math.PI / 2;
+                break;
+        }
+    };
+
+    const getMirroredPoints = (x, y, width, height) => {
+        const base = [{ x, y }];
+        const mirroredX = width - 1 - x;
+        const mirroredY = height - 1 - y;
+
+        if (mirrorModeRef.current === 'x' || mirrorModeRef.current === 'xy') {
+            base.push({ x: mirroredX, y });
+        }
+        if (mirrorModeRef.current === 'y' || mirrorModeRef.current === 'xy') {
+            base.push({ x, y: mirroredY });
+        }
+        if (mirrorModeRef.current === 'xy') {
+            base.push({ x: mirroredX, y: mirroredY });
+        }
+
+        const unique = new Map();
+        base.forEach(point => {
+            const key = `${point.x}:${point.y}`;
+            if (!unique.has(key)) unique.set(key, point);
+        });
+
+        return Array.from(unique.values());
+    };
+
+    const parseColorToRgba = (hex) => {
+        const safeHex = `${hex || '#000000'}`.replace('#', '');
+        const r = parseInt(safeHex.slice(0, 2), 16) || 0;
+        const g = parseInt(safeHex.slice(2, 4), 16) || 0;
+        const b = parseInt(safeHex.slice(4, 6), 16) || 0;
+        return [r, g, b, 255];
+    };
+
+    const paintAtPixel = (pixelX, pixelY) => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return;
+        const ctx = textureCanvas.getContext('2d');
+        const points = getMirroredPoints(pixelX, pixelY, textureCanvas.width, textureCanvas.height);
+
+        points.forEach((point) => {
+            const halfSize = Math.floor(brushSizeRef.current / 2);
+            const startX = Math.max(0, point.x - halfSize);
+            const startY = Math.max(0, point.y - halfSize);
+            const drawSize = Math.max(1, brushSizeRef.current);
+
+            if (toolRef.current === 'erase') {
+                ctx.clearRect(startX, startY, drawSize, drawSize);
+            } else {
+                ctx.fillStyle = brushColorRef.current;
+                ctx.fillRect(startX, startY, drawSize, drawSize);
+            }
+        });
+
+        scheduleSkinSync();
+    };
+
+    const fillFromPixel = (seedX, seedY) => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return;
+        const ctx = textureCanvas.getContext('2d');
+
+        const seeds = getMirroredPoints(seedX, seedY, textureCanvas.width, textureCanvas.height);
+        const replacement = toolRef.current === 'erase' ? [0, 0, 0, 0] : parseColorToRgba(brushColorRef.current);
+
+        const applyFill = (sx, sy) => {
+            const imageData = ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height);
+            const { data, width, height } = imageData;
+            const startIndex = (sy * width + sx) * 4;
+            const target = [
+                data[startIndex],
+                data[startIndex + 1],
+                data[startIndex + 2],
+                data[startIndex + 3]
+            ];
+
+            if (
+                target[0] === replacement[0] &&
+                target[1] === replacement[1] &&
+                target[2] === replacement[2] &&
+                target[3] === replacement[3]
+            ) {
+                return;
+            }
+
+            const stack = [[sx, sy]];
+            const matchAt = (index) => (
+                data[index] === target[0] &&
+                data[index + 1] === target[1] &&
+                data[index + 2] === target[2] &&
+                data[index + 3] === target[3]
+            );
+
+            while (stack.length) {
+                const [x, y] = stack.pop();
+                if (x < 0 || y < 0 || x >= width || y >= height) continue;
+
+                const idx = (y * width + x) * 4;
+                if (!matchAt(idx)) continue;
+
+                data[idx] = replacement[0];
+                data[idx + 1] = replacement[1];
+                data[idx + 2] = replacement[2];
+                data[idx + 3] = replacement[3];
+
+                stack.push([x + 1, y]);
+                stack.push([x - 1, y]);
+                stack.push([x, y + 1]);
+                stack.push([x, y - 1]);
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        };
+
+        seeds.forEach(({ x, y }) => applyFill(x, y));
+        scheduleSkinSync();
+    };
+
+    const getTexturePixelFromEvent = (event) => {
+        const textureCanvas = textureCanvasRef.current;
+        const textureLargeCanvas = textureLargeCanvasRef.current;
+        if (!textureCanvas || !textureLargeCanvas) return null;
+        const rect = textureLargeCanvas.getBoundingClientRect();
+        const localX = event.clientX - rect.left;
+        const localY = event.clientY - rect.top;
+        if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) return null;
+
+        const px = Math.max(0, Math.min(textureCanvas.width - 1, Math.floor((localX / rect.width) * textureCanvas.width)));
+        const py = Math.max(0, Math.min(textureCanvas.height - 1, Math.floor((localY / rect.height) * textureCanvas.height)));
+        return { px, py };
+    };
+
+    const syncViewerSkin = async () => {
+        if (!viewerRef.current || !textureCanvasRef.current) return;
+        const dataUrl = textureCanvasRef.current.toDataURL('image/png');
+        setFlatPreview(dataUrl);
+        await viewerRef.current.loadSkin(dataUrl, { model: editorModel === 'slim' ? 'slim' : 'classic' });
+        ["head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"].forEach(part => {
+            if (viewerRef.current.playerObject.skin[part]) {
+                viewerRef.current.playerObject.skin[part].innerLayer.visible = true;
+                viewerRef.current.playerObject.skin[part].outerLayer.visible = true;
+            }
+        });
+
+        const meshes = [];
+        viewerRef.current.playerObject.traverse(obj => {
+            if (obj?.isMesh && obj?.material?.map && obj?.geometry) {
+                meshes.push(obj);
+            }
+        });
+        meshesRef.current = meshes;
+        applyPose();
+        renderTextureLargeCanvas();
+    };
+
+    const scheduleSkinSync = () => {
+        if (syncScheduledRef.current) return;
+        syncScheduledRef.current = true;
+        requestAnimationFrame(async () => {
+            syncScheduledRef.current = false;
+            await syncViewerSkin();
+        });
+    };
+
+    useEffect(() => {
+        if (!open || !skinSrc || !textureCanvasRef.current) return;
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = textureCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+            canvas.width = 64;
+            canvas.height = img.height === 32 ? 32 : 64;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resetHistory();
+            scheduleSkinSync();
+        };
+        img.src = skinSrc;
+    }, [open, skinSrc]);
+
+    useEffect(() => {
+        if (!open || !viewerCanvasRef.current) return;
+
+        const viewer = new SkinViewer({
+            canvas: viewerCanvasRef.current,
+            width: 680,
+            height: 520,
+            skin: null
+        });
+
+        viewer.fov = 70;
+        viewer.zoom = 0.9;
+        viewer.autoRotate = false;
+        viewer.animation = null;
+        viewer.renderer.setPixelRatio(window.devicePixelRatio);
+        viewer.controls.enablePan = false;
+
+        viewerRef.current = viewer;
+
+        const resizeObserver = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    viewer.setSize(width, height);
+                }
+            }
+        });
+
+        if (viewerContainerRef.current) {
+            resizeObserver.observe(viewerContainerRef.current);
+        }
+
+        const paintFromViewerEvent = (event) => {
+            const textureCanvas = textureCanvasRef.current;
+            if (!textureCanvas || !viewerRef.current) return;
+
+            const rect = viewer.renderer.domElement.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            pointerVectorRef.current.set(x, y);
+            raycasterRef.current.setFromCamera(pointerVectorRef.current, viewer.camera);
+            const intersections = raycasterRef.current.intersectObjects(meshesRef.current, false);
+            if (!intersections.length || !intersections[0].uv) return;
+
+            const uv = intersections[0].uv;
+            const pixelX = Math.max(0, Math.min(textureCanvas.width - 1, Math.floor(uv.x * textureCanvas.width)));
+            const pixelY = Math.max(0, Math.min(textureCanvas.height - 1, Math.floor((1 - uv.y) * textureCanvas.height)));
+
+            if (lastPointerRef.current.x === pixelX && lastPointerRef.current.y === pixelY) {
+                return;
+            }
+            lastPointerRef.current = { x: pixelX, y: pixelY };
+
+            if (toolRef.current === 'fill') {
+                fillFromPixel(pixelX, pixelY);
+            } else {
+                paintAtPixel(pixelX, pixelY);
+            }
+        };
+
+        const paintFromTextureEvent = (event) => {
+            const pixel = getTexturePixelFromEvent(event);
+            if (!pixel) return;
+            if (lastPointerRef.current.x === pixel.px && lastPointerRef.current.y === pixel.py) return;
+            lastPointerRef.current = { x: pixel.px, y: pixel.py };
+
+            if (toolRef.current === 'fill') {
+                fillFromPixel(pixel.px, pixel.py);
+            } else {
+                paintAtPixel(pixel.px, pixel.py);
+            }
+        };
+
+        const beginStroke = () => {
+            if (strokeActiveRef.current) return;
+            strokeActiveRef.current = true;
+            pushHistorySnapshot();
+        };
+
+        const endStroke = () => {
+            strokeActiveRef.current = false;
+            pointerDownRef.current = false;
+            lastPointerRef.current = { x: -1, y: -1 };
+        };
+
+        const handlePointerDown = (event) => {
+            pointerDownRef.current = true;
+            lastPointerRef.current = { x: -1, y: -1 };
+            beginStroke();
+            if (activeLargeViewRef.current === 'player') {
+                paintFromViewerEvent(event);
+            } else {
+                paintFromTextureEvent(event);
+            }
+        };
+
+        const handlePointerMove = (event) => {
+            if (!pointerDownRef.current) return;
+            if (activeLargeViewRef.current === 'player') {
+                paintFromViewerEvent(event);
+            } else {
+                paintFromTextureEvent(event);
+            }
+        };
+
+        const handlePointerUp = () => endStroke();
+
+        viewer.renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+        viewer.renderer.domElement.addEventListener('pointermove', handlePointerMove);
+        textureLargeCanvasRef.current?.addEventListener('pointerdown', handlePointerDown);
+        textureLargeCanvasRef.current?.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+
+        const resizeObserverTexture = new ResizeObserver(() => renderTextureLargeCanvas());
+        if (textureLargeCanvasRef.current?.parentElement) {
+            resizeObserverTexture.observe(textureLargeCanvasRef.current.parentElement);
+        }
+
+        scheduleSkinSync();
+
+        return () => {
+            viewer.renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+            viewer.renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+            textureLargeCanvasRef.current?.removeEventListener('pointerdown', handlePointerDown);
+            textureLargeCanvasRef.current?.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            resizeObserver.disconnect();
+            resizeObserverTexture.disconnect();
+            viewer.dispose();
+            viewerRef.current = null;
+            pointerDownRef.current = false;
+            strokeActiveRef.current = false;
+            meshesRef.current = [];
+        };
+    }, [open]);
+
+    useEffect(() => {
+        if (!open || !viewerRef.current) return;
+        scheduleSkinSync();
+    }, [editorModel, open, pose]);
+
+    const handleUndo = () => {
+        if (historyIndexRef.current <= 0 || !textureCanvasRef.current) return;
+        historyIndexRef.current -= 1;
+        const snapshot = historyRef.current[historyIndexRef.current];
+        const ctx = textureCanvasRef.current.getContext('2d');
+        ctx.putImageData(cloneImageData(snapshot), 0, 0);
+        updateHistoryState();
+        scheduleSkinSync();
+    };
+
+    const handleRedo = () => {
+        if (historyIndexRef.current >= historyRef.current.length - 1 || !textureCanvasRef.current) return;
+        historyIndexRef.current += 1;
+        const snapshot = historyRef.current[historyIndexRef.current];
+        const ctx = textureCanvasRef.current.getContext('2d');
+        ctx.putImageData(cloneImageData(snapshot), 0, 0);
+        updateHistoryState();
+        scheduleSkinSync();
+    };
+
+    const canUndo = historyIndexRef.current > 0;
+    const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+
+    const handleSave = async () => {
+        if (!textureCanvasRef.current) return;
+
+        try {
+            setIsSaving(true);
+            const res = await window.electronAPI.saveLocalSkin({
+                source: 'data-url',
+                value: textureCanvasRef.current.toDataURL('image/png'),
+                name: skinName,
+                model: editorModel
+            });
+
+            if (res.success && res.skin) {
+                onSave(res.skin, editorModel);
+                onOpenChange(false);
+            } else if (res.error && res.error !== 'Cancelled') {
+                onNotify(t('skins.import_failed', { error: res.error }), 'error');
+            }
+        } catch (e) {
+            onNotify(t('skins.import_failed', { error: e.message }), 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-6xl">
+                <DialogHeader>
+                    <DialogTitle>{t('skins.advanced_editor')}</DialogTitle>
+                </DialogHeader>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <div className="lg:col-span-8 space-y-3">
+                        <div className="rounded-lg border border-border bg-muted/20 h-[520px] relative" ref={viewerContainerRef}>
+                            <canvas
+                                ref={viewerCanvasRef}
+                                className={`w-full h-full ${activeLargeView === 'player' ? 'cursor-crosshair opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'}`}
+                            />
+                            <canvas
+                                ref={textureLargeCanvasRef}
+                                className={`w-full h-full image-pixelated ${activeLargeView === 'texture' ? 'cursor-crosshair opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'}`}
+                            />
+                        </div>
+
+                        <div className="rounded-lg border border-border p-2 bg-muted/10">
+                            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                                {t('skins.swap_large_view')}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLargeView('player')}
+                                    className={`rounded border p-2 text-left ${activeLargeView === 'player' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
+                                >
+                                    <div className="text-xs font-medium">{t('skins.player_view')}</div>
+                                    <div className="text-[11px] text-muted-foreground">{t('skins.click_to_activate')}</div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLargeView('texture')}
+                                    className={`rounded border p-2 text-left ${activeLargeView === 'texture' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
+                                >
+                                    <div className="text-xs font-medium">{t('skins.texture_view')}</div>
+                                    {flatPreview ? (
+                                        <img src={flatPreview} alt="texture preview" className="w-full h-16 object-contain image-pixelated mt-1 rounded bg-muted/30" />
+                                    ) : (
+                                        <div className="text-[11px] text-muted-foreground">{t('common.loading')}</div>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label>{t('skins.skin_name')}</Label>
+                            <Input value={skinName} onChange={(e) => setSkinName(e.target.value)} maxLength={60} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.model')}</Label>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant={editorModel === 'classic' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setEditorModel('classic')}
+                                    className="flex-1"
+                                >
+                                    {t('skins.wide')}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={editorModel === 'slim' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setEditorModel('slim')}
+                                    className="flex-1"
+                                >
+                                    {t('skins.slim')}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.pose')}</Label>
+                            <select
+                                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                value={pose}
+                                onChange={(e) => setPose(e.target.value)}
+                            >
+                                <option value="t_pose">{t('skins.pose_t_pose')}</option>
+                                <option value="idle">{t('skins.pose_idle')}</option>
+                                <option value="wave">{t('skins.pose_wave')}</option>
+                                <option value="hero">{t('skins.pose_hero')}</option>
+                                <option value="sneak">{t('skins.pose_sneak')}</option>
+                                <option value="cross">{t('skins.pose_cross')}</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.tool')}</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={tool === 'paint' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setTool('paint')}
+                                    className="flex-1"
+                                >
+                                    <Paintbrush className="h-4 w-4" />
+                                    {t('skins.paint')}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={tool === 'erase' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setTool('erase')}
+                                    className="flex-1"
+                                >
+                                    <Eraser className="h-4 w-4" />
+                                    {t('skins.erase')}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={tool === 'fill' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setTool('fill')}
+                                    className="flex-1"
+                                >
+                                    {t('skins.fill')}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.mirror_mode')}</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button type="button" variant={mirrorMode === 'none' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('none')}>
+                                    {t('skins.mirror_none')}
+                                </Button>
+                                <Button type="button" variant={mirrorMode === 'x' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('x')}>
+                                    {t('skins.mirror_left_right')}
+                                </Button>
+                                <Button type="button" variant={mirrorMode === 'y' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('y')}>
+                                    {t('skins.mirror_top_bottom')}
+                                </Button>
+                                <Button type="button" variant={mirrorMode === 'xy' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('xy')}>
+                                    {t('skins.mirror_both')}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.color')}</Label>
+                            <Input
+                                type="color"
+                                value={brushColor}
+                                disabled={tool === 'erase'}
+                                onChange={(e) => setBrushColor(e.target.value)}
+                                className="h-10 p-1"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.brush_size')}</Label>
+                            <Input
+                                type="range"
+                                min={1}
+                                max={6}
+                                step={1}
+                                value={brushSize}
+                                onChange={(e) => setBrushSize(Number(e.target.value))}
+                                disabled={tool === 'fill'}
+                            />
+                            <div className="text-xs text-muted-foreground">
+                                {tool === 'fill' ? t('skins.fill_brush_note') : `${brushSize}px`}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('skins.history')}</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button type="button" variant="outline" size="sm" onClick={handleUndo} disabled={!canUndo}>
+                                    {t('skins.undo')}
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={handleRedo} disabled={!canRedo}>
+                                    {t('skins.redo')}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                            {t('skins.advanced_hint')}
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="button" onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                {t('common.save')}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                <canvas ref={textureCanvasRef} className="hidden" />
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 function Skins({ onLogout, onProfileUpdate }) {
     const { t } = useTranslation();
     const { addNotification } = useNotification();
@@ -202,6 +963,7 @@ function Skins({ onLogout, onProfileUpdate }) {
     const [originalVariant, setOriginalVariant] = useState('classic');
     const [showCapeModal, setShowCapeModal] = useState(false);
     const [showAddSkinModal, setShowAddSkinModal] = useState(false);
+    const [showAdvancedEditor, setShowAdvancedEditor] = useState(false);
     const [addSkinSource, setAddSkinSource] = useState('file');
     const [skinUrlInput, setSkinUrlInput] = useState('');
     const [skinUsernameInput, setSkinUsernameInput] = useState('');
@@ -584,6 +1346,17 @@ function Skins({ onLogout, onProfileUpdate }) {
         setEditingSkinId(null);
     };
 
+    const handleSaveAdvancedSkin = async (skin, nextModel) => {
+        setPendingSkin({ type: 'local', ...skin });
+        const resolvedModel = nextModel || skin.model || variant;
+        setVariant(resolvedModel);
+        if (skin.data) {
+            await updateSkinInViewer(skin.data, resolvedModel);
+        }
+        await loadLocalSkins();
+        addNotification(t('skins.advanced_saved'), 'success');
+    };
+
     return (
         <TooltipProvider>
             <div className="h-full flex overflow-hidden relative">
@@ -690,6 +1463,16 @@ function Skins({ onLogout, onProfileUpdate }) {
                     </DialogContent>
                 </Dialog>
 
+                <AdvancedSkinEditorDialog
+                    open={showAdvancedEditor}
+                    onOpenChange={setShowAdvancedEditor}
+                    skinSrc={getPendingPreviewUrl()}
+                    model={variant}
+                    onSave={handleSaveAdvancedSkin}
+                    onNotify={addNotification}
+                    t={t}
+                />
+
                 <div className="w-1/3 min-w-[300px] bg-card/50 backdrop-blur-sm border-r border-border flex flex-col items-center justify-center relative p-6">
                     <div className={`relative w-full h-[400px] flex items-center justify-center transition-opacity duration-300 ${isSkinLoaded || webglError ? 'opacity-100' : 'opacity-0'}`}>
                         <div className="pointer-events-none absolute left-1/2 -top-7 z-10 -translate-x-1/2">
@@ -780,6 +1563,23 @@ function Skins({ onLogout, onProfileUpdate }) {
                                 {capes.length ? t('skins.change_cape') : t('skins.no_capes')}
                             </TooltipContent>
                         </Tooltip>
+
+                        <Separator orientation="vertical" className="h-6" />
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                if (!getPendingPreviewUrl()) {
+                                    addNotification(t('skins.select_skin_first'), 'info');
+                                    return;
+                                }
+                                setShowAdvancedEditor(true);
+                            }}
+                        >
+                            <Paintbrush className="h-4 w-4" />
+                            {t('skins.advanced')}
+                        </Button>
                     </div>
                 </div>
 

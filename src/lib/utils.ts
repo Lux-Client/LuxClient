@@ -41,6 +41,17 @@ export function updateShadcnVars(theme) {
   const primary = theme.primaryColor || '#e26602';
   const bg = theme.backgroundColor || '#0d1117';
   const surface = theme.surfaceColor || '#161b22';
+  const textOnBackground = theme.textOnBackground || '#fafafa';
+  const textOnSurface = theme.textOnSurface || '#fafafa';
+  const textOnPrimary = theme.textOnPrimary || '#0d0d0d';
+
+  const isLightHex = (hex) => {
+    if (!hex || typeof hex !== 'string' || hex.length < 7) return false;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 >= 160;
+  };
 
   const bgHsl = hexToHsl(bg);
   const surfaceHsl = hexToHsl(surface);
@@ -50,30 +61,33 @@ export function updateShadcnVars(theme) {
   const lighterBg = hexToHsl(adjustHex(bg, 12));
   const mutedBg = hexToHsl(adjustHex(bg, 18));
   const borderColor = hexToHsl(adjustHex(bg, 16));
-  const mutedFg = hexToHsl(adjustHex(surface, 80));
+  const mutedFg = hexToHsl(adjustHex(textOnSurface, isLightHex(textOnSurface) ? -26 : 26));
   const accentBg = hexToHsl(adjustHex(bg, 22));
+  const textOnBackgroundHsl = hexToHsl(textOnBackground);
+  const textOnSurfaceHsl = hexToHsl(textOnSurface);
+  const textOnPrimaryHsl = hexToHsl(textOnPrimary);
 
   root.style.setProperty('--background', bgHsl);
-  root.style.setProperty('--foreground', '0 0% 98%');
+  root.style.setProperty('--foreground', textOnBackgroundHsl);
   root.style.setProperty('--card', surfaceHsl);
-  root.style.setProperty('--card-foreground', '0 0% 98%');
+  root.style.setProperty('--card-foreground', textOnSurfaceHsl);
   root.style.setProperty('--popover', darkerBg);
-  root.style.setProperty('--popover-foreground', '0 0% 98%');
+  root.style.setProperty('--popover-foreground', textOnSurfaceHsl);
   root.style.setProperty('--primary', primaryHsl);
-  root.style.setProperty('--primary-foreground', '0 0% 5%');
+  root.style.setProperty('--primary-foreground', textOnPrimaryHsl);
   root.style.setProperty('--secondary', lighterBg);
-  root.style.setProperty('--secondary-foreground', '0 0% 90%');
+  root.style.setProperty('--secondary-foreground', textOnBackgroundHsl);
   root.style.setProperty('--muted', mutedBg);
   root.style.setProperty('--muted-foreground', mutedFg);
   root.style.setProperty('--accent', accentBg);
-  root.style.setProperty('--accent-foreground', '0 0% 98%');
+  root.style.setProperty('--accent-foreground', textOnBackgroundHsl);
   root.style.setProperty('--border', borderColor);
   root.style.setProperty('--input', borderColor);
   root.style.setProperty('--ring', primaryHsl);
   root.style.setProperty('--sidebar', bgHsl);
   root.style.setProperty('--sidebar-foreground', mutedFg);
   root.style.setProperty('--sidebar-accent', lighterBg);
-  root.style.setProperty('--sidebar-accent-foreground', '0 0% 98%');
+  root.style.setProperty('--sidebar-accent-foreground', textOnBackgroundHsl);
   root.style.setProperty('--sidebar-border', borderColor);
   root.style.setProperty('--chart-1', primaryHsl);
 }

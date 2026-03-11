@@ -55,7 +55,7 @@ function MiniPreview({ theme }) {
                         style={{
                             background: i === 1 ? theme.primaryColor : 'transparent',
                             boxShadow: i === 1 ? `0 0 ${(theme.sidebarGlow ?? 0) * 20}px ${theme.primaryColor}` : 'none',
-                            color: i === 1 ? '#000' : '#666'
+                            color: i === 1 ? (theme.textOnPrimary ?? '#0d0d0d') : (theme.textOnSurface ?? '#666666')
                         }}
                     >
                         <div className="w-3 h-3 rounded-sm bg-current opacity-50" />
@@ -96,7 +96,7 @@ function MiniPreview({ theme }) {
                     className="h-8 rounded-lg flex items-center justify-center text-[8px] font-bold"
                     style={{
                         background: theme.primaryColor,
-                        color: '#000',
+                        color: theme.textOnPrimary ?? '#0d0d0d',
                         borderRadius: `${theme.borderRadius ?? 12}px`,
                         boxShadow: `0 0 ${(theme.sidebarGlow ?? 0) * 20}px ${theme.primaryColor}40`
                     }}

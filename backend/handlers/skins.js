@@ -290,6 +290,28 @@ module.exports = (ipcMain, mainWindow) => {
                     return await saveSkinBuffer(fileBuffer, resolvedSkin.name, { model: resolvedSkin.model });
                 }
 
+                if (source === 'data-url' || source === 'data') {
+                    if (!value) return { success: false, error: 'No skin data provided' };
+
+                    let base64Payload = value;
+                    if (source === 'data-url') {
+                        const dataUrlMatch = value.match(/^data:image\/png;base64,(.+)$/i);
+                        if (!dataUrlMatch || !dataUrlMatch[1]) {
+                            return { success: false, error: 'Invalid PNG data URL' };
+                        }
+                        base64Payload = dataUrlMatch[1];
+                    }
+
+                    const fileBuffer = Buffer.from(base64Payload, 'base64');
+                    if (!fileBuffer.length) {
+                        return { success: false, error: 'Invalid skin image data' };
+                    }
+
+                    const model = filePath.model === 'slim' ? 'slim' : (filePath.model === 'classic' ? 'classic' : undefined);
+                    const extraData = model ? { model } : {};
+                    return await saveSkinBuffer(fileBuffer, filePath.name || 'Edited Skin', extraData);
+                }
+
                 if (source) {
                     return { success: false, error: `Unsupported skin source: ${source}` };
                 }

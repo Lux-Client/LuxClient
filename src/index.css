@@ -249,6 +249,9 @@
     --background-dark-color-rgb: 11, 11, 11;
     --surface-color: #1c1c1c;
     --surface-color-rgb: 28, 28, 28;
+    --text-on-background: #fafafa;
+    --text-on-surface: #fafafa;
+    --text-on-primary: #0d0d0d;
     --glass-blur: 10px;
     --glass-opacity: 0.8;
     --console-opacity: 0.8;

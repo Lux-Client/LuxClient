@@ -80,6 +80,9 @@ function App() {
         primaryColor: '#e26602',
         backgroundColor: '#111111',
         surfaceColor: '#1c1c1c',
+        textOnBackground: '#fafafa',
+        textOnSurface: '#fafafa',
+        textOnPrimary: '#0d0d0d',
         glassBlur: 10,
         glassOpacity: 0.8,
         consoleOpacity: 0.8,
@@ -321,6 +324,9 @@ function App() {
         root.style.setProperty('--primary-color', t.primaryColor);
         root.style.setProperty('--background-color', t.backgroundColor);
         root.style.setProperty('--surface-color', t.surfaceColor);
+        root.style.setProperty('--text-on-background', t.textOnBackground ?? '#fafafa');
+        root.style.setProperty('--text-on-surface', t.textOnSurface ?? '#fafafa');
+        root.style.setProperty('--text-on-primary', t.textOnPrimary ?? '#0d0d0d');
         root.style.setProperty('--glass-blur', `${t.glassBlur}px`);
         root.style.setProperty('--glass-opacity', t.glassOpacity);
         root.style.setProperty('--console-opacity', t.consoleOpacity ?? 0.8);
