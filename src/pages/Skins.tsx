@@ -8,7 +8,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '../components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
@@ -28,6 +28,13 @@ const DEFAULT_SKINS = [
 ];
 
 const getDefaultSkinUrl = (skin, model) => skin.urls[model === 'slim' ? 'slim' : 'classic'];
+
+const resetViewerUnpackState = (viewer) => {
+    const gl = viewer?.renderer?.getContext?.();
+    if (!gl || typeof gl.pixelStorei !== 'function') return;
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+};
 
 const SkinPreview3D = ({ src, className, model = 'classic' }: { src?: any; className?: string; model?: string }) => {
     const canvasRef = useRef(null);
@@ -270,10 +277,17 @@ export const AdvancedSkinEditorDialog = ({
         setHistoryVersion(prev => prev + 1);
     };
 
+    const getTextureContext = () => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return null;
+        return textureCanvas.getContext('2d', { willReadFrequently: true });
+    };
+
     const resetHistory = () => {
         const textureCanvas = textureCanvasRef.current;
         if (!textureCanvas) return;
-        const ctx = textureCanvas.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
         const snapshot = cloneImageData(ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height));
         historyRef.current = [snapshot];
         historyIndexRef.current = 0;
@@ -283,7 +297,8 @@ export const AdvancedSkinEditorDialog = ({
     const pushHistorySnapshot = () => {
         const textureCanvas = textureCanvasRef.current;
         if (!textureCanvas) return;
-        const ctx = textureCanvas.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
         const snapshot = cloneImageData(ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height));
         const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
         nextHistory.push(snapshot);
@@ -409,7 +424,8 @@ export const AdvancedSkinEditorDialog = ({
     const paintAtPixel = (pixelX, pixelY) => {
         const textureCanvas = textureCanvasRef.current;
         if (!textureCanvas) return;
-        const ctx = textureCanvas.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
         const points = getMirroredPoints(pixelX, pixelY, textureCanvas.width, textureCanvas.height);
 
         points.forEach((point) => {
@@ -432,7 +448,8 @@ export const AdvancedSkinEditorDialog = ({
     const fillFromPixel = (seedX, seedY) => {
         const textureCanvas = textureCanvasRef.current;
         if (!textureCanvas) return;
-        const ctx = textureCanvas.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
 
         const seeds = getMirroredPoints(seedX, seedY, textureCanvas.width, textureCanvas.height);
         const replacement = toolRef.current === 'erase' ? [0, 0, 0, 0] : parseColorToRgba(brushColorRef.current);
@@ -505,19 +522,35 @@ export const AdvancedSkinEditorDialog = ({
     };
 
     const syncViewerSkin = async () => {
-        if (!viewerRef.current || !textureCanvasRef.current) return;
-        const dataUrl = textureCanvasRef.current.toDataURL('image/png');
-        setFlatPreview(dataUrl);
-        await viewerRef.current.loadSkin(dataUrl, { model: editorModel === 'slim' ? 'slim' : 'classic' });
+        const viewer = viewerRef.current;
+        const textureCanvas = textureCanvasRef.current;
+        if (!viewer || !textureCanvas) return;
+
+        try {
+            setFlatPreview(textureCanvas.toDataURL('image/png'));
+        } catch (previewError) {
+            console.warn('Failed to create advanced editor texture preview', previewError);
+            setFlatPreview('');
+        }
+
+        try {
+            resetViewerUnpackState(viewer);
+            await viewer.loadSkin(textureCanvas, { model: editorModel === 'slim' ? 'slim' : 'classic' });
+            resetViewerUnpackState(viewer);
+        } catch (error) {
+            console.error('Failed to sync advanced skin viewer texture', error);
+            return;
+        }
+
         ["head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"].forEach(part => {
-            if (viewerRef.current.playerObject.skin[part]) {
-                viewerRef.current.playerObject.skin[part].innerLayer.visible = true;
-                viewerRef.current.playerObject.skin[part].outerLayer.visible = true;
+            if (viewer.playerObject.skin[part]) {
+                viewer.playerObject.skin[part].innerLayer.visible = true;
+                viewer.playerObject.skin[part].outerLayer.visible = true;
             }
         });
 
         const meshes = [];
-        viewerRef.current.playerObject.traverse(obj => {
+        viewer.playerObject.traverse(obj => {
             if (obj?.isMesh && obj?.material?.map && obj?.geometry) {
                 meshes.push(obj);
             }
@@ -540,12 +573,13 @@ export const AdvancedSkinEditorDialog = ({
         if (!open || !skinSrc || !textureCanvasRef.current) return;
 
         let cancelled = false;
-        const isRemoteHttp = /^https?:\/\//i.test(skinSrc);
+        const isHttpUrl = (value) => typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+        const isRemoteHttp = isHttpUrl(skinSrc);
 
         const drawSkinToCanvas = (src, useCorsForHttp) => {
             return new Promise<void>((resolve, reject) => {
                 const img = new Image();
-                if (useCorsForHttp && /^https?:\/\//i.test(src)) {
+                if (useCorsForHttp && isHttpUrl(src)) {
                     img.crossOrigin = 'anonymous';
                 }
 
@@ -562,7 +596,11 @@ export const AdvancedSkinEditorDialog = ({
                     }
 
                     try {
-                        const ctx = canvas.getContext('2d');
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        if (!ctx) {
+                            reject(new Error('texture-canvas-context-unavailable'));
+                            return;
+                        }
                         canvas.width = 64;
                         canvas.height = img.height === 32 ? 32 : 64;
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -577,7 +615,11 @@ export const AdvancedSkinEditorDialog = ({
                 };
 
                 img.onerror = (event) => {
-                    console.error('Failed to load skin texture in advanced editor', { src, event });
+                    console.error('Failed to load skin texture in advanced editor', {
+                        src,
+                        isHttpSource: isHttpUrl(src),
+                        event
+                    });
                     reject(new Error('skin-image-load-failed'));
                 };
 
@@ -662,6 +704,7 @@ export const AdvancedSkinEditorDialog = ({
         viewer.controls.enableRotate = dragModeRef.current;
 
         viewerRef.current = viewer;
+        resetViewerUnpackState(viewer);
 
         const resizeObserver = new ResizeObserver(entries => {
             for (const entry of entries) {
@@ -798,7 +841,8 @@ export const AdvancedSkinEditorDialog = ({
         if (historyIndexRef.current <= 0 || !textureCanvasRef.current) return;
         historyIndexRef.current -= 1;
         const snapshot = historyRef.current[historyIndexRef.current];
-        const ctx = textureCanvasRef.current.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
         ctx.putImageData(cloneImageData(snapshot), 0, 0);
         updateHistoryState();
         scheduleSkinSync();
@@ -808,7 +852,8 @@ export const AdvancedSkinEditorDialog = ({
         if (historyIndexRef.current >= historyRef.current.length - 1 || !textureCanvasRef.current) return;
         historyIndexRef.current += 1;
         const snapshot = historyRef.current[historyIndexRef.current];
-        const ctx = textureCanvasRef.current.getContext('2d');
+        const ctx = getTextureContext();
+        if (!ctx) return;
         ctx.putImageData(cloneImageData(snapshot), 0, 0);
         updateHistoryState();
         scheduleSkinSync();
@@ -847,6 +892,9 @@ export const AdvancedSkinEditorDialog = ({
             <DialogContent className="max-w-6xl">
                 <DialogHeader>
                     <DialogTitle>{t('skins.advanced_editor')}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {t('skins.advanced_editor_desc', 'Edit your selected skin in the advanced pixel editor.')}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -1136,6 +1184,7 @@ function Skins({ onLogout, onProfileUpdate }) {
             viewer.renderer.setPixelRatio(window.devicePixelRatio);
 
             skinViewerRef.current = viewer;
+            resetViewerUnpackState(viewer);
             viewer.controls.enableZoom = false;
             viewer.controls.minPolarAngle = Math.PI / 2;
             viewer.controls.maxPolarAngle = Math.PI / 2;
@@ -1189,17 +1238,20 @@ function Skins({ onLogout, onProfileUpdate }) {
     }, [isAnimating]);
 
     const updateSkinInViewer = async (url, model) => {
-        if (!skinViewerRef.current) return;
+        const viewer = skinViewerRef.current;
+        if (!viewer) return;
         try {
-            await skinViewerRef.current.loadSkin(url, { model: model?.toLowerCase() || 'classic' });
+            resetViewerUnpackState(viewer);
+            await viewer.loadSkin(url, { model: model?.toLowerCase() || 'classic' });
+            resetViewerUnpackState(viewer);
             ["head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"].forEach(part => {
-                if (skinViewerRef.current.playerObject.skin[part]) {
-                    skinViewerRef.current.playerObject.skin[part].innerLayer.visible = true;
-                    skinViewerRef.current.playerObject.skin[part].outerLayer.visible = true;
+                if (viewer.playerObject.skin[part]) {
+                    viewer.playerObject.skin[part].innerLayer.visible = true;
+                    viewer.playerObject.skin[part].outerLayer.visible = true;
                 }
             });
             const activeCape = capes.find(c => c.id === activeCapeId);
-            if (activeCape) skinViewerRef.current.loadCape(activeCape.url);
+            if (activeCape) viewer.loadCape(activeCape.url);
 
             setIsSkinLoaded(true);
         } catch (e) {
@@ -1492,6 +1544,9 @@ function Skins({ onLogout, onProfileUpdate }) {
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
                             <DialogTitle>{t('skins.select_cape')}</DialogTitle>
+                            <DialogDescription className="sr-only">
+                                {t('skins.select_cape_desc', 'Choose an active cape for your profile.')}
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
                             <div
@@ -1526,6 +1581,9 @@ function Skins({ onLogout, onProfileUpdate }) {
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>{t('skins.add_skin')}</DialogTitle>
+                            <DialogDescription className="sr-only">
+                                {t('skins.add_skin_desc', 'Import a skin from file, URL, or username.')}
+                            </DialogDescription>
                         </DialogHeader>
                         <Tabs value={addSkinSource} onValueChange={setAddSkinSource} className="space-y-4">
                             <TabsList className="grid w-full grid-cols-3">
