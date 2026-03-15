@@ -181,12 +181,12 @@ function ToolsDashboard() {
                             {t('tools.skin_editor_start_desc', 'Choose how you want to start: with Steve or with your own texture file.')}
                         </p>
 
-                        <Button type="button" variant="outline" className="w-full justify-start" onClick={handleStartWithSteve}>
+                        <Button type="button" variant="default" className="w-full justify-start" onClick={handleStartWithSteve}>
                             <RotateCcw className="h-4 w-4" />
                             {t('tools.start_with_steve', 'Start with Steve')}
                         </Button>
 
-                        <Button type="button" className="w-full justify-start" onClick={handleStartWithTexture} disabled={isSelectingTexture}>
+                        <Button type="button" variant="secondary" className="w-full justify-start" onClick={handleStartWithTexture} disabled={isSelectingTexture}>
                             {isSelectingTexture ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
                             {t('tools.start_with_texture', 'Start with Texture')}
                         </Button>

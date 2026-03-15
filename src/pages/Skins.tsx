@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '../components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { Separator } from '../components/ui/separator';
-import { Plus, Trash2, Pencil, Pause, Play, X, AlertTriangle, Loader2, User, Crown, ImageUp, Link2, Download, Paintbrush, Eraser, Save, PaintBucket, Hand } from 'lucide-react';
+import { Plus, Trash2, Pencil, Pause, Play, X, AlertTriangle, Loader2, User, Crown, ImageUp, Link2, Download, Paintbrush, Eraser, Save, PaintBucket, Hand, Settings2 } from 'lucide-react';
 
 const DEFAULT_SKINS = [
     { name: 'Steve', defaultModel: 'classic', urls: { classic: '/assets/skins/steve-classic.png', slim: '/assets/skins/steve-slim.png' } },
@@ -36,60 +36,9 @@ const resetViewerUnpackState = (viewer) => {
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
-const SkinPreview3D = ({ src, className, model = 'classic' }: { src?: any; className?: string; model?: string }) => {
-    const canvasRef = useRef(null);
-    const containerRef = useRef(null);
-    const viewerRef = useRef(null);
-
-    useEffect(() => {
-        if (!canvasRef.current || !src) return;
-
-        let viewer;
-        try {
-            viewer = new SkinViewer({
-                canvas: canvasRef.current,
-                width: 300,
-                height: 400,
-                skin: src
-            });
-            viewer.model = model?.toLowerCase() === 'slim' ? 'slim' : 'classic';
-            viewer.zoom = 0.85;
-            viewer.fov = 70;
-            viewer.autoRotate = false;
-            viewer.renderer.setPixelRatio(window.devicePixelRatio);
-
-            viewer.playerObject.rotation.y = 0.5;
-
-            viewerRef.current = viewer;
-
-            const resizeObserver = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    const { width, height } = entry.contentRect;
-                    if (width > 0 && height > 0) {
-                        viewer.setSize(width, height);
-                    }
-                }
-            });
-
-            if (containerRef.current) {
-                resizeObserver.observe(containerRef.current);
-            }
-
-            return () => {
-                resizeObserver.disconnect();
-                if (viewer) viewer.dispose();
-            };
-        } catch (e) {
-            console.error("Failed to render 3D preview", e);
-        }
-    }, [src, model]);
-
-    return (
-        <div ref={containerRef} className={`w-full h-full min-h-0 ${className}`}>
-            <canvas ref={canvasRef} className="w-full h-full block" />
-        </div>
-    );
-};
+// Browsers typically allow ~16 concurrent WebGL contexts. Reserve room for the main viewer.
+let activeWebGLContexts = 0;
+const MAX_WEBGL_CONTEXTS = 12;
 
 const SkinPreview = ({ src, className, model = 'classic' }: { src?: any; className?: string; model?: string }) => {
     const canvasRef = useRef(null);
@@ -156,6 +105,74 @@ const SkinPreview = ({ src, className, model = 'classic' }: { src?: any; classNa
     }, [src, model]);
 
     return <canvas ref={canvasRef} className={`w-full h-full object-contain image-pixelated ${className}`} />;
+};
+
+const SkinPreview3D = ({ src, className, model = 'classic' }: { src?: any; className?: string; model?: string }) => {
+    const canvasRef = useRef(null);
+    const containerRef = useRef(null);
+    const [useFallback, setUseFallback] = useState(false);
+
+    useEffect(() => {
+        if (!canvasRef.current || !src || useFallback) return;
+
+        if (activeWebGLContexts >= MAX_WEBGL_CONTEXTS) {
+            setUseFallback(true);
+            return;
+        }
+
+        activeWebGLContexts++;
+        let viewer;
+        try {
+            viewer = new SkinViewer({
+                canvas: canvasRef.current,
+                width: 300,
+                height: 400,
+                skin: src
+            });
+            viewer.model = model?.toLowerCase() === 'slim' ? 'slim' : 'classic';
+            viewer.zoom = 0.85;
+            viewer.fov = 70;
+            viewer.autoRotate = false;
+            viewer.renderer.setPixelRatio(window.devicePixelRatio);
+
+            viewer.playerObject.rotation.y = 0.5;
+
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const { width, height } = entry.contentRect;
+                    if (width > 0 && height > 0) {
+                        viewer.setSize(width, height);
+                    }
+                }
+            });
+
+            if (containerRef.current) {
+                resizeObserver.observe(containerRef.current);
+            }
+
+            return () => {
+                resizeObserver.disconnect();
+                if (viewer) {
+                    viewer.dispose();
+                    activeWebGLContexts--;
+                }
+            };
+        } catch (e) {
+            activeWebGLContexts--;
+            console.error("Failed to render 3D preview", e);
+            setUseFallback(true);
+        }
+    }, [src, model, useFallback]);
+
+    if (useFallback) {
+        return <SkinPreview src={src} className={className} model={model} />;
+    }
+
+    return (
+        <div ref={containerRef} className={`w-full h-full min-h-0 ${className}`}>
+            <canvas ref={canvasRef} className="w-full h-full block" />
+        </div>
+    );
 };
 
 const CapePreview = ({ src, className }: { src?: any; className?: string }) => {
@@ -245,6 +262,35 @@ const sanitizeSkinFileName = (name) => {
     return sanitized || 'edited-skin';
 };
 
+const DEFAULT_SKIN_EDITOR_TOOL_HOTKEYS = {
+    paint: 'p',
+    erase: 'e',
+    fill: 'f',
+    pipette: 'i',
+    replace: 'r'
+};
+
+const normalizeHotkeyValue = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.trim().toLowerCase().slice(0, 1);
+};
+
+const normalizeSkinEditorToolHotkeys = (rawHotkeys) => {
+    const normalized = { ...DEFAULT_SKIN_EDITOR_TOOL_HOTKEYS };
+    if (!rawHotkeys || typeof rawHotkeys !== 'object') {
+        return normalized;
+    }
+
+    Object.keys(normalized).forEach((toolName) => {
+        const candidate = normalizeHotkeyValue(rawHotkeys[toolName]);
+        if (candidate) {
+            normalized[toolName] = candidate;
+        }
+    });
+
+    return normalized;
+};
+
 export const AdvancedSkinEditorDialog = ({
     open,
     onOpenChange,
@@ -273,27 +319,31 @@ export const AdvancedSkinEditorDialog = ({
     const lastPointerRef = useRef({ x: -1, y: -1 });
     const historyRef = useRef<ImageData[]>([]);
     const historyIndexRef = useRef(-1);
-    const toolRef = useRef<'paint' | 'erase' | 'fill'>('paint');
+    const toolRef = useRef<'paint' | 'erase' | 'fill' | 'pipette' | 'replace'>('paint');
     const brushColorRef = useRef('#ff6600');
     const brushSizeRef = useRef(1);
     const mirrorModeRef = useRef<'none' | 'x' | 'y' | 'xy'>('none');
     const activeLargeViewRef = useRef<'player' | 'texture'>('player');
     const dragModeRef = useRef(false);
     const paintLayerRef = useRef<'inner' | 'outer'>('inner');
+    const strokeDirtyRef = useRef(false);
 
     const [editorModel, setEditorModel] = useState(model || 'classic');
     const [brushColor, setBrushColor] = useState('#ff6600');
     const [brushSize, setBrushSize] = useState(1);
-    const [tool, setTool] = useState<'paint' | 'erase' | 'fill'>('paint');
+    const [tool, setTool] = useState<'paint' | 'erase' | 'fill' | 'pipette' | 'replace'>('paint');
     const [mirrorMode, setMirrorMode] = useState<'none' | 'x' | 'y' | 'xy'>('none');
     const [activeLargeView, setActiveLargeView] = useState<'player' | 'texture'>('player');
     const [dragMode, setDragMode] = useState(false);
     const [paintLayer, setPaintLayer] = useState<'inner' | 'outer'>('inner');
     const [pose, setPose] = useState('t_pose');
+    const [toolHotkeys, setToolHotkeys] = useState({ ...DEFAULT_SKIN_EDITOR_TOOL_HOTKEYS });
     const [flatPreview, setFlatPreview] = useState('');
     const [skinName, setSkinName] = useState('Edited Skin');
     const [isSaving, setIsSaving] = useState(false);
     const [, setHistoryVersion] = useState(0);
+    const [showHotkeySettings, setShowHotkeySettings] = useState(false);
+    const toolHotkeysRef = useRef({ ...DEFAULT_SKIN_EDITOR_TOOL_HOTKEYS });
 
     useEffect(() => {
         if (!open) return;
@@ -342,6 +392,122 @@ export const AdvancedSkinEditorDialog = ({
     useEffect(() => {
         paintLayerRef.current = paintLayer;
     }, [paintLayer]);
+
+    useEffect(() => {
+        toolHotkeysRef.current = toolHotkeys;
+    }, [toolHotkeys]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        let cancelled = false;
+
+        const loadToolHotkeys = async () => {
+            try {
+                const settingsRes = await window.electronAPI.getSettings();
+                if (!settingsRes?.success || cancelled) return;
+
+                const nextHotkeys = normalizeSkinEditorToolHotkeys(settingsRes.settings?.skinEditorHotkeys);
+                setToolHotkeys(nextHotkeys);
+            } catch (error) {
+                logSkinEditorDebug(debugContext, 'load-tool-hotkeys-failed', {
+                    error: error?.message || String(error)
+                });
+            }
+        };
+
+        loadToolHotkeys();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [debugContext, open]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handleHotkeyDown = (event) => {
+            if (event.defaultPrevented) return;
+            if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+            const target = event.target as HTMLElement | null;
+            if (target) {
+                const tagName = target.tagName?.toLowerCase();
+                const isEditable =
+                    target.isContentEditable ||
+                    tagName === 'input' ||
+                    tagName === 'textarea' ||
+                    tagName === 'select';
+
+                if (isEditable) return;
+            }
+
+            const pressedKey = `${event.key || ''}`.toLowerCase();
+            if (pressedKey.length !== 1) return;
+
+            const matchedEntry = Object.entries(toolHotkeysRef.current).find(([, hotkey]) => hotkey === pressedKey);
+            if (!matchedEntry) return;
+
+            const matchedTool = matchedEntry[0] as 'paint' | 'erase' | 'fill' | 'pipette' | 'replace';
+            if (matchedTool === toolRef.current) return;
+
+            event.preventDefault();
+            setTool(matchedTool);
+        };
+
+        window.addEventListener('keydown', handleHotkeyDown);
+        return () => window.removeEventListener('keydown', handleHotkeyDown);
+    }, [open]);
+
+    const persistToolHotkeys = async (nextHotkeys) => {
+        try {
+            const settingsRes = await window.electronAPI.getSettings();
+            if (!settingsRes?.success) {
+                return;
+            }
+
+            const saveRes = await window.electronAPI.saveSettings({
+                ...settingsRes.settings,
+                skinEditorHotkeys: nextHotkeys
+            });
+
+            if (!saveRes?.success) {
+                throw new Error(saveRes?.error || 'save-failed');
+            }
+        } catch (error) {
+            logSkinEditorDebug(debugContext, 'save-tool-hotkeys-failed', {
+                error: error?.message || String(error)
+            });
+        }
+    };
+
+    const handleToolHotkeyChange = (toolName: 'paint' | 'erase' | 'fill' | 'pipette' | 'replace', rawValue: string) => {
+        const nextValue = normalizeHotkeyValue(rawValue);
+
+        setToolHotkeys((prev) => {
+            const next = { ...prev };
+
+            if (nextValue) {
+                Object.keys(next).forEach((key) => {
+                    if (key !== toolName && next[key] === nextValue) {
+                        next[key] = '';
+                    }
+                });
+            }
+
+            next[toolName] = nextValue;
+            toolHotkeysRef.current = next;
+            void persistToolHotkeys(next);
+            return next;
+        });
+    };
+
+    const resetToolHotkeys = () => {
+        const defaults = { ...DEFAULT_SKIN_EDITOR_TOOL_HOTKEYS };
+        setToolHotkeys(defaults);
+        toolHotkeysRef.current = defaults;
+        void persistToolHotkeys(defaults);
+    };
 
     const cloneImageData = (imageData) => {
         return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
@@ -522,12 +688,18 @@ export const AdvancedSkinEditorDialog = ({
         return [r, g, b, 255];
     };
 
-    const paintAtPixel = (pixelX, pixelY) => {
+    const rgbaToHex = (r, g, b) => {
+        const toHex = (value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, '0');
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    };
+
+    const paintAtPixel = (pixelX, pixelY, drawMode = 'paint', shouldSync = true) => {
         const textureCanvas = textureCanvasRef.current;
-        if (!textureCanvas) return;
+        if (!textureCanvas) return false;
         const ctx = getTextureContext();
-        if (!ctx) return;
+        if (!ctx) return false;
         const points = getMirroredPoints(pixelX, pixelY, textureCanvas.width, textureCanvas.height);
+        let changed = false;
 
         points.forEach((point) => {
             const halfSize = Math.floor(brushSizeRef.current / 2);
@@ -535,25 +707,32 @@ export const AdvancedSkinEditorDialog = ({
             const startY = Math.max(0, point.y - halfSize);
             const drawSize = Math.max(1, brushSizeRef.current);
 
-            if (toolRef.current === 'erase') {
+            if (drawMode === 'erase') {
                 ctx.clearRect(startX, startY, drawSize, drawSize);
             } else {
                 ctx.fillStyle = brushColorRef.current;
                 ctx.fillRect(startX, startY, drawSize, drawSize);
             }
+
+            changed = true;
         });
 
-        scheduleSkinSync();
+        if (changed && shouldSync) {
+            scheduleSkinSync();
+        }
+
+        return changed;
     };
 
     const fillFromPixel = (seedX, seedY) => {
         const textureCanvas = textureCanvasRef.current;
-        if (!textureCanvas) return;
+        if (!textureCanvas) return false;
         const ctx = getTextureContext();
-        if (!ctx) return;
+        if (!ctx) return false;
 
         const seeds = getMirroredPoints(seedX, seedY, textureCanvas.width, textureCanvas.height);
-        const replacement = toolRef.current === 'erase' ? [0, 0, 0, 0] : parseColorToRgba(brushColorRef.current);
+        const replacement = parseColorToRgba(brushColorRef.current);
+        let changed = false;
 
         const applyFill = (sx, sy) => {
             const imageData = ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height);
@@ -572,7 +751,7 @@ export const AdvancedSkinEditorDialog = ({
                 target[2] === replacement[2] &&
                 target[3] === replacement[3]
             ) {
-                return;
+                return false;
             }
 
             const stack = [[sx, sy]];
@@ -602,10 +781,83 @@ export const AdvancedSkinEditorDialog = ({
             }
 
             ctx.putImageData(imageData, 0, 0);
+            return true;
         };
 
-        seeds.forEach(({ x, y }) => applyFill(x, y));
+        seeds.forEach(({ x, y }) => {
+            if (applyFill(x, y)) {
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            scheduleSkinSync();
+        }
+
+        return changed;
+    };
+
+    const replaceColorFromPixel = (seedX, seedY) => {
+        const textureCanvas = textureCanvasRef.current;
+        if (!textureCanvas) return false;
+        const ctx = getTextureContext();
+        if (!ctx) return false;
+
+        const imageData = ctx.getImageData(0, 0, textureCanvas.width, textureCanvas.height);
+        const { data, width, height } = imageData;
+        const seedIndex = (seedY * width + seedX) * 4;
+        const target = [
+            data[seedIndex],
+            data[seedIndex + 1],
+            data[seedIndex + 2],
+            data[seedIndex + 3]
+        ];
+        const replacement = parseColorToRgba(brushColorRef.current);
+
+        if (
+            target[0] === replacement[0] &&
+            target[1] === replacement[1] &&
+            target[2] === replacement[2] &&
+            target[3] === replacement[3]
+        ) {
+            return false;
+        }
+
+        let changed = false;
+        for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+                const idx = (y * width + x) * 4;
+                if (
+                    data[idx] === target[0] &&
+                    data[idx + 1] === target[1] &&
+                    data[idx + 2] === target[2] &&
+                    data[idx + 3] === target[3]
+                ) {
+                    data[idx] = replacement[0];
+                    data[idx + 1] = replacement[1];
+                    data[idx + 2] = replacement[2];
+                    data[idx + 3] = replacement[3];
+                    changed = true;
+                }
+            }
+        }
+
+        if (!changed) {
+            return false;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
         scheduleSkinSync();
+        return true;
+    };
+
+    const pickColorFromPixel = (pixelX, pixelY) => {
+        const ctx = getTextureContext();
+        if (!ctx) return false;
+
+        const pixelData = ctx.getImageData(pixelX, pixelY, 1, 1).data;
+        setBrushColor(rgbaToHex(pixelData[0], pixelData[1], pixelData[2]));
+        return true;
     };
 
     const getTexturePixelFromEvent = (event) => {
@@ -981,9 +1233,9 @@ export const AdvancedSkinEditorDialog = ({
 
             textureLargeCanvas = nextTextureLargeCanvas;
 
-            const paintFromViewerEvent = (event) => {
+            const getViewerPixelFromEvent = (event) => {
                 const textureCanvas = textureCanvasRef.current;
-                if (!textureCanvas || !viewerRef.current) return;
+                if (!textureCanvas || !viewerRef.current) return null;
 
                 const rect = viewer.renderer.domElement.getBoundingClientRect();
                 const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -996,45 +1248,87 @@ export const AdvancedSkinEditorDialog = ({
                     : outerLayerMeshesRef.current;
                 const raycastMeshes = preferredMeshes.length > 0 ? preferredMeshes : meshesRef.current;
                 const intersections = raycasterRef.current.intersectObjects(raycastMeshes, false);
-                if (!intersections.length || !intersections[0].uv) return;
+                if (!intersections.length || !intersections[0].uv) return null;
 
                 const uv = intersections[0].uv;
-                const pixelX = Math.max(0, Math.min(textureCanvas.width - 1, Math.floor(uv.x * textureCanvas.width)));
-                const pixelY = Math.max(0, Math.min(textureCanvas.height - 1, Math.floor((1 - uv.y) * textureCanvas.height)));
+                const px = Math.max(0, Math.min(textureCanvas.width - 1, Math.floor(uv.x * textureCanvas.width)));
+                const py = Math.max(0, Math.min(textureCanvas.height - 1, Math.floor((1 - uv.y) * textureCanvas.height)));
+                return { px, py };
+            };
 
-                if (lastPointerRef.current.x === pixelX && lastPointerRef.current.y === pixelY) {
+            const applyToolAtPixel = (pixelX, pixelY, phase = 'move') => {
+                const activeTool = toolRef.current;
+                const samePoint = lastPointerRef.current.x === pixelX && lastPointerRef.current.y === pixelY;
+
+                if ((activeTool === 'paint' || activeTool === 'erase') && samePoint && phase !== 'down') {
                     return;
                 }
+
                 lastPointerRef.current = { x: pixelX, y: pixelY };
 
-                if (toolRef.current === 'fill') {
-                    fillFromPixel(pixelX, pixelY);
-                } else {
-                    paintAtPixel(pixelX, pixelY);
+                if (activeTool === 'paint') {
+                    if (paintAtPixel(pixelX, pixelY, 'paint')) {
+                        strokeDirtyRef.current = true;
+                    }
+                    return;
+                }
+
+                if (activeTool === 'erase') {
+                    if (paintAtPixel(pixelX, pixelY, 'erase')) {
+                        strokeDirtyRef.current = true;
+                    }
+                    return;
+                }
+
+                if (activeTool === 'fill') {
+                    if (phase === 'down' && fillFromPixel(pixelX, pixelY)) {
+                        strokeDirtyRef.current = true;
+                    }
+                    return;
+                }
+
+                if (activeTool === 'pipette') {
+                    if (phase === 'down') {
+                        pickColorFromPixel(pixelX, pixelY);
+                    }
+                    return;
+                }
+
+                if (activeTool === 'replace') {
+                    if (phase === 'down' && replaceColorFromPixel(pixelX, pixelY)) {
+                        strokeDirtyRef.current = true;
+                    }
+                    return;
                 }
             };
 
-            const paintFromTextureEvent = (event) => {
-                const pixel = getTexturePixelFromEvent(event);
-                if (!pixel) return;
-                if (lastPointerRef.current.x === pixel.px && lastPointerRef.current.y === pixel.py) return;
-                lastPointerRef.current = { x: pixel.px, y: pixel.py };
+            const paintFromViewerEvent = (event, phase = 'move') => {
+                const pixel = getViewerPixelFromEvent(event);
+                if (!pixel) return null;
+                applyToolAtPixel(pixel.px, pixel.py, phase);
+                return pixel;
+            };
 
-                if (toolRef.current === 'fill') {
-                    fillFromPixel(pixel.px, pixel.py);
-                } else {
-                    paintAtPixel(pixel.px, pixel.py);
-                }
+            const paintFromTextureEvent = (event, phase = 'move') => {
+                const pixel = getTexturePixelFromEvent(event);
+                if (!pixel) return null;
+                applyToolAtPixel(pixel.px, pixel.py, phase);
+                return pixel;
             };
 
             const beginStroke = () => {
                 if (strokeActiveRef.current) return;
                 strokeActiveRef.current = true;
-                pushHistorySnapshot();
+                strokeDirtyRef.current = false;
             };
 
             const endStroke = () => {
+                if (strokeActiveRef.current && strokeDirtyRef.current) {
+                    pushHistorySnapshot();
+                }
+
                 strokeActiveRef.current = false;
+                strokeDirtyRef.current = false;
                 pointerDownRef.current = false;
                 lastPointerRef.current = { x: -1, y: -1 };
             };
@@ -1047,18 +1341,18 @@ export const AdvancedSkinEditorDialog = ({
                 lastPointerRef.current = { x: -1, y: -1 };
                 beginStroke();
                 if (activeLargeViewRef.current === 'player') {
-                    paintFromViewerEvent(event);
+                    paintFromViewerEvent(event, 'down');
                 } else {
-                    paintFromTextureEvent(event);
+                    paintFromTextureEvent(event, 'down');
                 }
             };
 
             handlePointerMove = (event) => {
                 if (!pointerDownRef.current) return;
                 if (activeLargeViewRef.current === 'player') {
-                    paintFromViewerEvent(event);
+                    paintFromViewerEvent(event, 'move');
                 } else {
-                    paintFromTextureEvent(event);
+                    paintFromTextureEvent(event, 'move');
                 }
             };
 
@@ -1098,6 +1392,7 @@ export const AdvancedSkinEditorDialog = ({
             viewerRef.current = null;
             pointerDownRef.current = false;
             strokeActiveRef.current = false;
+            strokeDirtyRef.current = false;
             meshesRef.current = [];
             innerLayerMeshesRef.current = [];
             outerLayerMeshesRef.current = [];
@@ -1134,6 +1429,7 @@ export const AdvancedSkinEditorDialog = ({
 
     const canUndo = historyIndexRef.current > 0;
     const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+    const brushSizeProgress = ((brushSize - 1) / (16 - 1)) * 100;
 
     const handleSave = async () => {
         if (!textureCanvasRef.current) return;
@@ -1198,252 +1494,318 @@ export const AdvancedSkinEditorDialog = ({
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-6xl">
-                <DialogHeader>
-                    <DialogTitle>{title || t('skins.advanced_editor')}</DialogTitle>
-                    <DialogDescription className="sr-only">
-                        {t('skins.advanced_editor_desc', 'Edit your selected skin in the advanced pixel editor.')}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <div className="lg:col-span-8 space-y-3">
-                        <div className="rounded-lg border border-border bg-muted/20 h-[520px] relative" ref={viewerContainerRef}>
-                            <canvas
-                                ref={viewerCanvasRef}
-                                className={`w-full h-full ${activeLargeView === 'player' ? `${dragMode ? 'cursor-grab' : 'cursor-crosshair'} opacity-100` : 'opacity-0 pointer-events-none absolute inset-0'}`}
-                            />
-                            <canvas
-                                ref={textureLargeCanvasRef}
-                                className={`w-full h-full image-pixelated ${activeLargeView === 'texture' ? `${dragMode ? 'cursor-not-allowed' : 'cursor-crosshair'} opacity-100` : 'opacity-0 pointer-events-none absolute inset-0'}`}
-                            />
+        <>
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="max-w-6xl">
+                    <DialogHeader>
+                        <div className="flex items-center justify-between pr-6">
+                            <DialogTitle>{title || t('skins.advanced_editor')}</DialogTitle>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => setShowHotkeySettings(true)}
+                                        >
+                                            <Settings2 className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{t('skins.tool_hotkeys', 'Tool Hotkeys')}</TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
+                        <DialogDescription className="sr-only">
+                            {t('skins.advanced_editor_desc', 'Edit your selected skin in the advanced pixel editor.')}
+                        </DialogDescription>
+                    </DialogHeader>
 
-                        <div className="rounded-lg border border-border p-2 bg-muted/10">
-                            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                                {t('skins.swap_large_view')}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <div className="lg:col-span-8 space-y-3">
+                            <div className="rounded-lg border border-border bg-muted/20 h-[520px] relative" ref={viewerContainerRef}>
+                                <canvas
+                                    ref={viewerCanvasRef}
+                                    className={`w-full h-full ${activeLargeView === 'player' ? `${dragMode ? 'cursor-grab' : 'cursor-crosshair'} opacity-100` : 'opacity-0 pointer-events-none absolute inset-0'}`}
+                                />
+                                <canvas
+                                    ref={textureLargeCanvasRef}
+                                    className={`w-full h-full image-pixelated ${activeLargeView === 'texture' ? `${dragMode ? 'cursor-not-allowed' : 'cursor-crosshair'} opacity-100` : 'opacity-0 pointer-events-none absolute inset-0'}`}
+                                />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveLargeView('player')}
-                                    className={`rounded border p-2 text-left ${activeLargeView === 'player' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
-                                >
-                                    <div className="text-xs font-medium">{t('skins.player_view')}</div>
-                                    <div className="text-[11px] text-muted-foreground">{t('skins.click_to_activate')}</div>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveLargeView('texture')}
-                                    className={`rounded border p-2 text-left ${activeLargeView === 'texture' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
-                                >
-                                    <div className="text-xs font-medium">{t('skins.texture_view')}</div>
-                                    {flatPreview ? (
-                                        <img src={flatPreview} alt="texture preview" className="w-full h-16 object-contain image-pixelated mt-1 rounded bg-muted/30" />
-                                    ) : (
-                                        <div className="text-[11px] text-muted-foreground">{t('common.loading')}</div>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="lg:col-span-4 space-y-4">
-                        <div className="space-y-2">
-                            <Label>{t('skins.skin_name')}</Label>
-                            <Input value={skinName} onChange={(e) => setSkinName(e.target.value)} maxLength={60} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.model')}</Label>
-                            <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant={editorModel === 'classic' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setEditorModel('classic')}
-                                    className="flex-1"
-                                >
-                                    {t('skins.wide')}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={editorModel === 'slim' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setEditorModel('slim')}
-                                    className="flex-1"
-                                >
-                                    {t('skins.slim')}
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.pose')}</Label>
-                            <select
-                                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                                value={pose}
-                                onChange={(e) => setPose(e.target.value)}
-                            >
-                                <option value="t_pose">{t('skins.pose_t_pose')}</option>
-                                <option value="idle">{t('skins.pose_idle')}</option>
-                                <option value="wave">{t('skins.pose_wave')}</option>
-                                <option value="hero">{t('skins.pose_hero')}</option>
-                                <option value="sneak">{t('skins.pose_sneak')}</option>
-                                <option value="cross">{t('skins.pose_cross')}</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.tool')}</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                <Button
-                                    type="button"
-                                    variant={tool === 'paint' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setTool('paint')}
-                                    className="flex-1"
-                                >
-                                    <Paintbrush className="h-4 w-4" />
-                                    {t('skins.paint')}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={tool === 'erase' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setTool('erase')}
-                                    className="flex-1"
-                                >
-                                    <Eraser className="h-4 w-4" />
-                                    {t('skins.erase')}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={tool === 'fill' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setTool('fill')}
-                                    className="flex-1"
-                                >
-                                    <PaintBucket className="h-4 w-4" />
-                                    {t('skins.fill')}
-                                </Button>
-                            </div>
-                            <Button
-                                type="button"
-                                variant={dragMode ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setDragMode(prev => !prev)}
-                                className="w-full"
-                            >
-                                <Hand className="h-4 w-4" />
-                                {t('skins.drag_mode', 'Drag mode')}
-                            </Button>
-                            {dragMode && (
-                                <div className="text-xs text-muted-foreground">
-                                    {t('skins.drag_mode_hint', 'Drag mode active: painting is disabled.')}
+                            <div className="rounded-lg border border-border p-2 bg-muted/10">
+                                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                                    {t('skins.swap_large_view')}
                                 </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.mirror_mode')}</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button type="button" variant={mirrorMode === 'none' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('none')}>
-                                    {t('skins.mirror_none')}
-                                </Button>
-                                <Button type="button" variant={mirrorMode === 'x' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('x')}>
-                                    {t('skins.mirror_left_right')}
-                                </Button>
-                                <Button type="button" variant={mirrorMode === 'y' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('y')}>
-                                    {t('skins.mirror_top_bottom')}
-                                </Button>
-                                <Button type="button" variant={mirrorMode === 'xy' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('xy')}>
-                                    {t('skins.mirror_both')}
-                                </Button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveLargeView('player')}
+                                        className={`rounded border p-2 text-left ${activeLargeView === 'player' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
+                                    >
+                                        <div className="text-xs font-medium">{t('skins.player_view')}</div>
+                                        <div className="text-[11px] text-muted-foreground">{t('skins.click_to_activate')}</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveLargeView('texture')}
+                                        className={`rounded border p-2 text-left ${activeLargeView === 'texture' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}
+                                    >
+                                        <div className="text-xs font-medium">{t('skins.texture_view')}</div>
+                                        {flatPreview ? (
+                                            <img src={flatPreview} alt="texture preview" className="w-full h-16 object-contain image-pixelated mt-1 rounded bg-muted/30" />
+                                        ) : (
+                                            <div className="text-[11px] text-muted-foreground">{t('common.loading')}</div>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>{t('skins.paint_layer', 'Paint Layer')}</Label>
-                            <div className="grid grid-cols-2 gap-2">
+                        <div className="lg:col-span-4 space-y-4">
+                            <div className="space-y-2">
+                                <Label>{t('skins.skin_name')}</Label>
+                                <Input value={skinName} onChange={(e) => setSkinName(e.target.value)} maxLength={60} />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.model')}</Label>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={editorModel === 'classic' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setEditorModel('classic')}
+                                        className="flex-1"
+                                    >
+                                        {t('skins.wide')}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={editorModel === 'slim' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setEditorModel('slim')}
+                                        className="flex-1"
+                                    >
+                                        {t('skins.slim')}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.pose')}</Label>
+                                <select
+                                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                    value={pose}
+                                    onChange={(e) => setPose(e.target.value)}
+                                >
+                                    <option value="t_pose">{t('skins.pose_t_pose')}</option>
+                                    <option value="idle">{t('skins.pose_idle')}</option>
+                                    <option value="wave">{t('skins.pose_wave')}</option>
+                                    <option value="hero">{t('skins.pose_hero')}</option>
+                                    <option value="sneak">{t('skins.pose_sneak')}</option>
+                                    <option value="cross">{t('skins.pose_cross')}</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.tool')}</Label>
+                                <TooltipProvider>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {([
+                                            { id: 'paint' as const, label: t('skins.paint'), icon: <Paintbrush className="h-4 w-4" /> },
+                                            { id: 'erase' as const, label: t('skins.erase'), icon: <Eraser className="h-4 w-4" /> },
+                                            { id: 'fill' as const, label: t('skins.fill'), icon: <PaintBucket className="h-4 w-4" /> },
+                                            { id: 'pipette' as const, label: t('skins.pipette', 'Pipette'), icon: null },
+                                            { id: 'replace' as const, label: t('skins.color_replace', 'Color Replace'), icon: null },
+                                        ]).map((entry) => {
+                                            const hotkey = toolHotkeys[entry.id];
+                                            return (
+                                                <Tooltip key={entry.id}>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            variant={tool === entry.id ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            onClick={() => setTool(entry.id)}
+                                                            className="flex-1"
+                                                        >
+                                                            {entry.icon}
+                                                            {entry.label}
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        {hotkey ? `${entry.label} (${hotkey.toUpperCase()})` : entry.label}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            );
+                                        })}
+                                    </div>
+                                </TooltipProvider>
+
                                 <Button
                                     type="button"
-                                    variant={paintLayer === 'inner' ? 'default' : 'outline'}
+                                    variant={dragMode ? 'default' : 'outline'}
                                     size="sm"
-                                    onClick={() => setPaintLayer('inner')}
+                                    onClick={() => setDragMode(prev => !prev)}
+                                    className="w-full"
                                 >
-                                    {t('skins.first_layer', 'First Layer')}
+                                    <Hand className="h-4 w-4" />
+                                    {t('skins.drag_mode', 'Drag mode')}
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant={paintLayer === 'outer' ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setPaintLayer('outer')}
-                                >
-                                    {t('skins.second_layer', 'Second Layer')}
+                                {dragMode && (
+                                    <div className="text-xs text-muted-foreground">
+                                        {t('skins.drag_mode_hint', 'Drag mode active: painting is disabled.')}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.mirror_mode')}</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button type="button" variant={mirrorMode === 'none' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('none')}>
+                                        {t('skins.mirror_none')}
+                                    </Button>
+                                    <Button type="button" variant={mirrorMode === 'x' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('x')}>
+                                        {t('skins.mirror_left_right')}
+                                    </Button>
+                                    <Button type="button" variant={mirrorMode === 'y' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('y')}>
+                                        {t('skins.mirror_top_bottom')}
+                                    </Button>
+                                    <Button type="button" variant={mirrorMode === 'xy' ? 'default' : 'outline'} size="sm" onClick={() => setMirrorMode('xy')}>
+                                        {t('skins.mirror_both')}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.paint_layer', 'Paint Layer')}</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={paintLayer === 'inner' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setPaintLayer('inner')}
+                                    >
+                                        {t('skins.first_layer', 'First Layer')}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={paintLayer === 'outer' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setPaintLayer('outer')}
+                                    >
+                                        {t('skins.second_layer', 'Second Layer')}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.color')}</Label>
+                                <Input
+                                    type="color"
+                                    value={brushColor}
+                                    disabled={tool === 'erase' || tool === 'pipette'}
+                                    onChange={(e) => setBrushColor(e.target.value)}
+                                    className="h-10 p-1"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.brush_size')}</Label>
+                                <Input
+                                    type="range"
+                                    min={1}
+                                    max={16}
+                                    step={1}
+                                    value={brushSize}
+                                    onChange={(e) => setBrushSize(Number(e.target.value))}
+                                    disabled={tool === 'fill' || tool === 'pipette' || tool === 'replace'}
+                                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer slider-thumb px-0"
+                                    style={{
+                                        background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${brushSizeProgress}%, hsl(var(--muted)) ${brushSizeProgress}%, hsl(var(--muted)) 100%)`
+                                    }}
+                                />
+                                <div className="text-xs text-muted-foreground">
+                                    {tool === 'fill' || tool === 'pipette' || tool === 'replace'
+                                        ? t('skins.brush_not_used', 'Brush size is not used for this tool.')
+                                        : `${brushSize}px`}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('skins.history')}</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={handleUndo} disabled={!canUndo}>
+                                        {t('skins.undo')}
+                                    </Button>
+                                    <Button type="button" variant="outline" size="sm" onClick={handleRedo} disabled={!canRedo}>
+                                        {t('skins.redo')}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                                {t('skins.advanced_hint')}
+                            </div>
+
+                            <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                    {t('common.cancel')}
+                                </Button>
+                                <Button type="button" onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    {t('common.save')}
                                 </Button>
                             </div>
                         </div>
+                    </div>
 
+                    <canvas ref={textureCanvasRef} className="hidden" />
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showHotkeySettings} onOpenChange={setShowHotkeySettings}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{t('skins.tool_hotkeys', 'Tool Hotkeys')}</DialogTitle>
+                        <DialogDescription className="sr-only">Configure tool hotkeys</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">{t('skins.tool_hotkeys_hint', 'Press the key in the editor to switch tools. Empty value disables a hotkey.')}</p>
                         <div className="space-y-2">
-                            <Label>{t('skins.color')}</Label>
-                            <Input
-                                type="color"
-                                value={brushColor}
-                                disabled={tool === 'erase'}
-                                onChange={(e) => setBrushColor(e.target.value)}
-                                className="h-10 p-1"
-                            />
+                            {[
+                                { tool: 'paint', label: t('skins.paint') },
+                                { tool: 'erase', label: t('skins.erase') },
+                                { tool: 'fill', label: t('skins.fill') },
+                                { tool: 'pipette', label: t('skins.pipette', 'Pipette') },
+                                { tool: 'replace', label: t('skins.color_replace', 'Color Replace') }
+                            ].map((entry) => (
+                                <div key={entry.tool} className="flex items-center gap-3">
+                                    <span className="text-sm flex-1">{entry.label}</span>
+                                    <Input
+                                        value={(toolHotkeys[entry.tool] || '').toUpperCase()}
+                                        onChange={(e) => handleToolHotkeyChange(entry.tool as 'paint' | 'erase' | 'fill' | 'pipette' | 'replace', e.target.value)}
+                                        maxLength={1}
+                                        className="h-8 w-12 px-0 text-center uppercase font-mono"
+                                    />
+                                </div>
+                            ))}
                         </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.brush_size')}</Label>
-                            <Input
-                                type="range"
-                                min={1}
-                                max={6}
-                                step={1}
-                                value={brushSize}
-                                onChange={(e) => setBrushSize(Number(e.target.value))}
-                                disabled={tool === 'fill'}
-                            />
-                            <div className="text-xs text-muted-foreground">
-                                {tool === 'fill' ? t('skins.fill_brush_note') : `${brushSize}px`}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>{t('skins.history')}</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button type="button" variant="outline" size="sm" onClick={handleUndo} disabled={!canUndo}>
-                                    {t('skins.undo')}
-                                </Button>
-                                <Button type="button" variant="outline" size="sm" onClick={handleRedo} disabled={!canRedo}>
-                                    {t('skins.redo')}
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                            {t('skins.advanced_hint')}
-                        </div>
-
-                        <div className="flex gap-2 justify-end">
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                {t('common.cancel')}
+                        <div className="flex justify-between pt-1">
+                            <Button type="button" variant="ghost" size="sm" onClick={resetToolHotkeys}>
+                                {t('common.reset', 'Reset')}
                             </Button>
-                            <Button type="button" onClick={handleSave} disabled={isSaving}>
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                {t('common.save')}
+                            <Button type="button" size="sm" onClick={() => setShowHotkeySettings(false)}>
+                                {t('common.done', 'Done')}
                             </Button>
                         </div>
                     </div>
-                </div>
-
-                <canvas ref={textureCanvasRef} className="hidden" />
-            </DialogContent>
-        </Dialog>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 };
 

@@ -866,7 +866,15 @@
     "setup": {
         "chooseLanguage": "Sprache auswählen",
         "chooseLanguageDesc": "Wählen Sie Ihre bevorzugte Sprache, um das Setup fortzusetzen.",
-        "skipSelection": "Auswahl überspringen (Standard: Englisch)"
+        "skipSelection": "Auswahl überspringen (Standard: Englisch)",
+        "chooseTheme": "Theme auswählen",
+        "chooseThemeDesc": "Wähle das Standard-Design für Lux. Du kannst es später unter Design ändern.",
+        "darkMode": "Darkmode",
+        "darkModeDesc": "Setzt Lux Forest als Standard-Theme.",
+        "lightMode": "Lightmode",
+        "lightModeDesc": "Setzt Light Lux als Standard-Theme.",
+        "useDarkMode": "Darkmode verwenden",
+        "useLightMode": "Lightmode verwenden"
     },
     "agreement": {
         "title": "Herzlich Willkommen bei Lux",

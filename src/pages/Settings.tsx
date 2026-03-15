@@ -1396,7 +1396,7 @@ function Settings({ mode = 'default' }) {
                     </Card>
                     <ExtensionSlot name="settings.bottom" className="mt-4" />
                 </div>
-            </PageContent>
+            </PageContent >
 
             {showSoftResetModal && (
                 <ConfirmationModal
@@ -1407,31 +1407,36 @@ function Settings({ mode = 'default' }) {
                     onConfirm={handleSoftReset}
                     onCancel={() => setShowSoftResetModal(false)}
                 />
-            )}
+            )
+            }
 
-            {showFactoryResetModal && (
-                <ConfirmationModal
-                    title={t('settings.maintenance.factory_reset_modal_title')}
-                    message={t('settings.maintenance.factory_reset_modal_msg')}
-                    confirmText={t('settings.maintenance.factory_reset_confirm_btn')}
-                    isDangerous={true}
-                    onConfirm={handleFactoryReset}
-                    onCancel={() => setShowFactoryResetModal(false)}
-                />
-            )}
+            {
+                showFactoryResetModal && (
+                    <ConfirmationModal
+                        title={t('settings.maintenance.factory_reset_modal_title')}
+                        message={t('settings.maintenance.factory_reset_modal_msg')}
+                        confirmText={t('settings.maintenance.factory_reset_confirm_btn')}
+                        isDangerous={true}
+                        onConfirm={handleFactoryReset}
+                        onCancel={() => setShowFactoryResetModal(false)}
+                    />
+                )
+            }
 
-            {showRestartModal && (
-                <ConfirmationModal
-                    title={t('settings.compatibility.restart_title', 'Restart Required')}
-                    message={t('settings.compatibility.restart_msg', 'Enabling Legacy GPU Support requires an application restart to apply changes to the graphics engine. Would you like to restart now?')}
-                    confirmText={t('settings.compatibility.restart_confirm', 'Restart Now')}
-                    cancelText={t('settings.compatibility.restart_cancel', 'Not Now')}
-                    isDangerous={false}
-                    onConfirm={handleConfirmRestart}
-                    onCancel={() => setShowRestartModal(false)}
-                />
-            )}
-        </div>
+            {
+                showRestartModal && (
+                    <ConfirmationModal
+                        title={t('settings.compatibility.restart_title', 'Restart Required')}
+                        message={t('settings.compatibility.restart_msg', 'Enabling Legacy GPU Support requires an application restart to apply changes to the graphics engine. Would you like to restart now?')}
+                        confirmText={t('settings.compatibility.restart_confirm', 'Restart Now')}
+                        cancelText={t('settings.compatibility.restart_cancel', 'Not Now')}
+                        isDangerous={false}
+                        onConfirm={handleConfirmRestart}
+                        onCancel={() => setShowRestartModal(false)}
+                    />
+                )
+            }
+        </div >
     );
 }
 

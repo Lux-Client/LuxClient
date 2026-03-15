@@ -28,6 +28,7 @@ import CommandPalette from './components/CommandPalette';
 import UpdateNotification from './components/UpdateNotification';
 import AgreementModal from './components/AgreementModal';
 import LanguageSelectionModal from './components/LanguageSelectionModal';
+import ThemeModeSelectionModal from './components/ThemeModeSelectionModal';
 import LoadingOverlay from './components/LoadingOverlay';
 import WindowControls from './components/WindowControls';
 import CrashModal from './components/CrashModal';
@@ -70,6 +71,24 @@ function ErrorFallback() {
         </div>
     );
 }
+
+const LUX_FOREST_THEME_PRESET = {
+    primaryColor: '#e26602',
+    backgroundColor: '#111111',
+    surfaceColor: '#1c1c1c',
+    textOnBackground: '#f5f5f5',
+    textOnSurface: '#f5f5f5',
+    textOnPrimary: '#1a1208'
+};
+
+const LIGHT_LUX_THEME_PRESET = {
+    primaryColor: '#d24e01',
+    backgroundColor: '#f9ddb1',
+    surfaceColor: '#f5c77e',
+    textOnBackground: '#2a1a0e',
+    textOnSurface: '#2c1b0f',
+    textOnPrimary: '#fff4ea'
+};
 
 function App() {
     const { t, i18n } = useTranslation();
@@ -148,7 +167,7 @@ function App() {
                 if (settingsRes.success && settingsRes.settings.startPage) {
                     startPage = settingsRes.settings.startPage;
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             if (window.electronAPI?.validateSession) {
                 const res = await window.electronAPI.validateSession();
@@ -208,7 +227,7 @@ function App() {
                 try {
                     const v = await window.electronAPI.getVersion();
                     setAppVersion(v);
-                } catch (e) {}
+                } catch (e) { }
             }
         };
 
@@ -281,7 +300,7 @@ function App() {
             });
         });
 
-        const removeLaunchProgressListener = window.electronAPI?.onLaunchProgress((e) => {});
+        const removeLaunchProgressListener = window.electronAPI?.onLaunchProgress((e) => { });
 
         const removeWindowStateListener = window.electronAPI?.onWindowStateChange((maximized) => {
             setIsMaximized(maximized);
@@ -310,7 +329,7 @@ function App() {
     }, []);
 
     const handleAcceptAgreement = async () => {
-        const newSettings = { ...appSettings, hasAcceptedToS: true };
+        const newSettings = { ...appSettings, hasAcceptedToS: true, hasSelectedThemeMode: false };
         const res = await window.electronAPI.saveSettings(newSettings);
         if (res.success) {
             setAppSettings(newSettings);
@@ -328,6 +347,26 @@ function App() {
         const res = await window.electronAPI.saveSettings(newSettings);
         if (res.success) {
             setAppSettings(newSettings);
+        }
+    };
+
+    const handleThemeModeSelect = async (mode) => {
+        const selectedThemePreset = mode === 'light' ? LIGHT_LUX_THEME_PRESET : LUX_FOREST_THEME_PRESET;
+        const nextTheme = {
+            ...(appSettings.theme || {}),
+            ...selectedThemePreset
+        };
+        const newSettings = {
+            ...appSettings,
+            hasSelectedThemeMode: true,
+            theme: nextTheme
+        };
+
+        const res = await window.electronAPI.saveSettings(newSettings);
+        if (res.success) {
+            setAppSettings(newSettings);
+            setTheme(nextTheme);
+            applyTheme(nextTheme);
         }
     };
 
@@ -416,7 +455,7 @@ function App() {
             if (settingsRes.success && settingsRes.settings.startPage) {
                 startPage = settingsRes.settings.startPage;
             }
-        } catch (e) {}
+        } catch (e) { }
 
         startTransition(() => {
             setUserProfile(profile);
@@ -493,7 +532,12 @@ function App() {
     const isLoginView = !userProfile && !isGuest;
     const isLanguageSelectionOpen = !isInitialLoading && appSettings.hasSelectedLanguage === false;
     const isAgreementModalOpen = !isInitialLoading && appSettings.hasSelectedLanguage === true && appSettings.hasAcceptedToS === false;
-    const isCommandPaletteAvailable = !isLoginView && !isLanguageSelectionOpen && !isAgreementModalOpen;
+    const isThemeModeSelectionOpen =
+        !isInitialLoading &&
+        appSettings.hasSelectedLanguage === true &&
+        appSettings.hasAcceptedToS === true &&
+        appSettings.hasSelectedThemeMode === false;
+    const isCommandPaletteAvailable = !isLoginView && !isLanguageSelectionOpen && !isAgreementModalOpen && !isThemeModeSelectionOpen;
     const canAccessSkins = Boolean(userProfile) && !isGuest;
 
     return (
@@ -684,6 +728,10 @@ function App() {
                     onAccept={handleAcceptAgreement}
                     onDecline={handleDeclineAgreement}
                 />
+            )}
+
+            {isThemeModeSelectionOpen && (
+                <ThemeModeSelectionModal onSelect={handleThemeModeSelect} />
             )}
 
         </ExtensionProvider>

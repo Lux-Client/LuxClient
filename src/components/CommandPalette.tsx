@@ -48,7 +48,7 @@ function CommandPalette({ open, onOpenChange, onNavigate, onModeSelect, currentM
       const list = await window.electronAPI.getInstances();
       const instanceMode = currentMode === 'client' || currentMode === 'launcher' ? currentMode : undefined;
       setInstances(filterInstancesForMode(list, instanceMode));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSelect = useCallback((action) => {
@@ -123,7 +123,7 @@ function CommandPalette({ open, onOpenChange, onNavigate, onModeSelect, currentM
                       key={inst.name}
                       value={inst.name}
                       onSelect={() => handleSelect(() => {
-                        try { window.electronAPI.launchGame(inst.name); } catch (e) {}
+                        try { window.electronAPI.launchGame(inst.name); } catch (e) { }
                       })}
                       className="gap-3 py-2.5 px-3 rounded-lg cursor-pointer"
                     >

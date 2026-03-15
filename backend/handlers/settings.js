@@ -50,7 +50,8 @@ module.exports = (ipcMain) => {
         },
         language: 'en',
         hasAcceptedToS: false,
-        hasSelectedLanguage: false
+        hasSelectedLanguage: false,
+        hasSelectedThemeMode: true
     };
 
     const buildSettings = (settings = {}) => ({
