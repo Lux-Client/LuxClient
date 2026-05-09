@@ -496,6 +496,7 @@
         "sign_in_button": "Entrar com a Microsoft",
         "logging_in": "Entrando...",
         "failed": "Falha ao entrar",
+        "guest_mode": "Modo Convidado",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

@@ -209,8 +209,12 @@ function Client() {
 
   useEffect(() => {
     loadVersions();
-    loadInstances();
-    loadClientSettings();
+
+    const init = async () => {
+      await loadClientSettings();
+      loadInstances();
+    };
+    init();
 
     const removeStatusListener = window.electronAPI?.onInstanceStatus?.(
       ({ status }) => {

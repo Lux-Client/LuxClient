@@ -178,6 +178,8 @@ interface ElectronAPI {
   removePlayit: (serverName: string) => Promise<any>;
   getServerSettings: () => Promise<any>;
   saveServerSettings: (settings: any) => Promise<any>;
+  listDirectory: (path: string) => Promise<any>;
+  getHomeDir: () => Promise<string>;
   selectFolder: () => Promise<any>;
 
   onServerStatus: (callback: IpcCallback) => UnsubscribeFn;
@@ -192,6 +194,7 @@ interface ElectronAPI {
 
   getExtensions: () => Promise<any>;
   installExtension: (sourcePath: string) => Promise<any>;
+  installExtensionBytes: (filename: string, data: Uint8Array) => Promise<any>;
   removeExtension: (id: string) => Promise<any>;
   toggleExtension: (id: string, enabled: boolean) => Promise<any>;
   onExtensionFile: (callback: IpcCallback) => UnsubscribeFn;

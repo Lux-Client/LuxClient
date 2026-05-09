@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { load, Store } from "@tauri-apps/plugin-store";
 
@@ -18,9 +19,9 @@ const tauriBridge: any = {
   isDeveloperMode: false,
   getVersion: () => Promise.resolve("1.7.0"),
 
-  minimize: () => invoke("minimize"),
-  maximize: () => invoke("maximize"),
-  close: () => invoke("close"),
+  minimize: () => getCurrentWindow().minimize(),
+  maximize: () => getCurrentWindow().toggleMaximize(),
+  close: () => getCurrentWindow().close(),
   
   getSettings: async () => {
     try {
@@ -43,6 +44,7 @@ const tauriBridge: any = {
         await store.set(key, settings[key]);
       }
       await store.save();
+      await emit("settings-updated", settings);
       return { success: true };
     } catch (e) {
       return { success: false, error: String(e) };
@@ -65,7 +67,9 @@ const tauriBridge: any = {
 
   onWindowStateChange: (callback: any) => {
     let unlisten: any;
-    listen("tauri://window-state-change", (event) => callback(event.payload)).then(u => unlisten = u);
+    getCurrentWindow().onResized(() => {
+      getCurrentWindow().isMaximized().then((maximized) => callback(maximized));
+    }).then((u) => unlisten = u);
     return () => unlisten?.();
   },
   onCrashReport: (callback: any) => {
@@ -203,6 +207,8 @@ const tauriBridge: any = {
   factoryReset: () => invoke("factory_reset"),
   uninstallLauncher: () => invoke("uninstall_launcher"),
 
+  listDirectory: (path: string) => invoke("list_directory", { pathStr: path }),
+  getHomeDir: () => invoke("get_home_dir"),
   openFileDialog: (options: any) => invoke("open_file_dialog", { options }),
   selectFolder: () => invoke("select_folder"),
   
@@ -252,6 +258,15 @@ const tauriBridge: any = {
   importMrPack: () => invoke("import_mrpack"),
   importFile: () => invoke("import_file"),
   openInstanceFolder: (name: string) => invoke("open_instance_folder", { name }),
+
+  getExtensions: () => invoke("get_extensions"),
+  installExtension: (sourcePath: string) => invoke("install_extension", { sourcePath }),
+  installExtensionBytes: (filename: string, data: number[]) => invoke("install_extension_bytes", { filename, data }),
+  removeExtension: (id: string) => invoke("remove_extension", { id }),
+  toggleExtension: (id: string, enabled: boolean) => Promise.resolve({ success: true }),
+  onExtensionFile: (_callback: any) => { return () => {}; },
+  invokeExtension: (_extId: string, _channel: string, ..._args: any[]) => Promise.resolve({}),
+  onExtensionMessage: (_extId: string, _channel: string, _callback: (...args: any[]) => void) => { return () => {}; },
 };
 
 // Inject into window

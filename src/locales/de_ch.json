@@ -498,6 +498,7 @@
         "sign_in_button": "Mit Microsoft aamälde",
         "logging_in": "Aamäldig lauft...",
         "failed": "Aamäldig isch gscheitert",
+        "guest_mode": "Gastmodus",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

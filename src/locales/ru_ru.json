@@ -496,6 +496,7 @@
         "sign_in_button": "Войти через Microsoft",
         "logging_in": "Вход...",
         "failed": "Ошибка входа",
+        "guest_mode": "Гостевой режим",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

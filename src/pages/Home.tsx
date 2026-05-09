@@ -154,6 +154,7 @@ function Home({
     const cleanupSettings = window.electronAPI.onSettingsUpdated?.((s) => {
       setSettings(s);
       loadModpacks();
+      loadInstances();
     });
 
     return () => {

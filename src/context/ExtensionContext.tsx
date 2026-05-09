@@ -7,6 +7,29 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const ExtensionContext = createContext<any>(null);
 const EXTENSIONS_ENABLED = true;
 
+const BUILTIN_EXTENSIONS: Array<{
+    id: string;
+    name: string;
+    version: string;
+    description: string;
+    author: string;
+    enabled: boolean;
+    loader: (api: any) => void;
+}> = [
+    {
+        id: 'pixel-editor',
+        name: 'Pixel Editor',
+        version: '1.0.0',
+        description: 'Pixel art icon editor for creating instance icons.',
+        author: 'LuxTeam',
+        enabled: false,
+        loader: async (api) => {
+            const { default: PixelEditorButton } = await import('../components/Extensions/PixelEditorExtension');
+            api.ui.registerView('instance.create.iconEditor', PixelEditorButton, { priority: 100 });
+        },
+    },
+];
+
 export const useExtensions = () => useContext(ExtensionContext);
 
 export const ExtensionStore = create((set, get) => ({
@@ -468,6 +491,16 @@ export const ExtensionProvider = ({ children }: { children: React.ReactNode }) =
 
         try {
             loggerRef.current[ext.id]?.info('Loading...');
+
+            const builtin = BUILTIN_EXTENSIONS.find(b => b.id === ext.id);
+            if (builtin) {
+                const api = createExtensionApi(ext.id, 'builtin://' + ext.id);
+                setActiveExtensions(prev => ({ ...prev, [ext.id]: { exports: {}, api } }));
+                await builtin.loader(api);
+                loggerRef.current[ext.id]?.info('Registered built-in extension');
+                return;
+            }
+
             const entryPath = ext.localPath + '/' + (ext.main || 'index.js');
             const importUrl = `app-media:///${entryPath}`;
             const response = await fetch(importUrl);
@@ -514,11 +547,14 @@ export const ExtensionProvider = ({ children }: { children: React.ReactNode }) =
                 loggerRef.current[id]?.error('Extension not found');
                 return;
             }
-            
-            const result = await window.electronAPI?.toggleExtension(id, enabled);
-            if (!result?.success) {
-                loggerRef.current[id]?.error('Toggle failed:', result?.error);
-                return;
+
+            const isBuiltin = BUILTIN_EXTENSIONS.some(b => b.id === id);
+            if (!isBuiltin) {
+                const result = await window.electronAPI?.toggleExtension(id, enabled);
+                if (!result?.success) {
+                    loggerRef.current[id]?.error('Toggle failed:', result?.error);
+                    return;
+                }
             }
             
             setInstalledExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled } : e));
@@ -538,26 +574,46 @@ export const ExtensionProvider = ({ children }: { children: React.ReactNode }) =
             setLoading(false);
             return;
         }
-        if (!window.electronAPI) {
-            setLoading(false);
-            return;
+
+        let backendExtensions: any[] = [];
+        if (window.electronAPI) {
+            try {
+                const result = await window.electronAPI.getExtensions();
+                if (result?.success) {
+                    backendExtensions = result.extensions;
+                }
+            } catch (e) {
+                console.error("Failed to refresh extensions:", e);
+            }
         }
 
-        try {
-            const result = await window.electronAPI.getExtensions();
-            if (result?.success) {
-                setInstalledExtensions(result.extensions);
-                for (const ext of result.extensions) {
-                    if (ext.enabled && !activeExtensions[ext.id]) {
-                        await loadExtension(ext);
-                    } else if (!ext.enabled && activeExtensions[ext.id]) {
-                        await unloadExtension(ext.id);
-                    }
-                }
+        const builtinEntries = BUILTIN_EXTENSIONS.map(b => ({
+            id: b.id,
+            name: b.name,
+            version: b.version,
+            description: b.description,
+            author: b.author,
+            enabled: b.enabled,
+            localPath: 'builtin://' + b.id,
+            main: '',
+        }));
+
+        const existingIds = new Set(backendExtensions.map(e => e.id));
+        const merged = [
+            ...backendExtensions,
+            ...builtinEntries.filter(b => !existingIds.has(b.id)),
+        ];
+
+        setInstalledExtensions(merged);
+
+        for (const ext of merged) {
+            if (ext.enabled && !activeExtensions[ext.id]) {
+                await loadExtension(ext);
+            } else if (!ext.enabled && activeExtensions[ext.id]) {
+                await unloadExtension(ext.id);
             }
-        } catch (e) {
-            console.error("Failed to refresh extensions:", e);
         }
+
         setLoading(false);
     };
 

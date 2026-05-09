@@ -496,6 +496,7 @@
         "sign_in_button": "Se connecter avec Microsoft",
         "logging_in": "Connexion en cours...",
         "failed": "La connexion a échoué, si vous vener d'acheter Minecraft il vous faudra d'abord installer le launcher officiel",
+        "guest_mode": "Mode invité",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

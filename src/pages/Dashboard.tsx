@@ -11,8 +11,8 @@ import ModpackCodeModal from "../components/ModpackCodeModal";
 import OptimizedImage from "../components/OptimizedImage";
 import { useTranslation } from "react-i18next";
 import PageHeader from "../components/layout/PageHeader";
-import { PixelEditorModal } from "../components/PixelEditorModal";
 import PageContent from "../components/layout/PageContent";
+import ExtensionSlot from "../components/Extensions/ExtensionSlot";
 import EmptyState from "../components/layout/EmptyState";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -343,7 +343,6 @@ function Dashboard({
   const { t } = useTranslation();
   const [instances, setInstances] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPixelEditor, setShowPixelEditor] = useState(false);
 
   useEffect(() => {
     if (triggerCreate) {
@@ -1843,15 +1842,10 @@ function Dashboard({
                     <span className="text-[11px] text-muted-foreground">
                       or
                     </span>
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-[11px] font-medium"
-                      onClick={() => setShowPixelEditor(true)}
-                    >
-                      {t("dashboard.pixel_editor_btn", "Pixel Editor")}
-                    </Button>
+                    <ExtensionSlot
+                      name="instance.create.iconEditor"
+                      context={{ onIconSelect: setNewInstanceIcon, currentIcon: newInstanceIcon }}
+                    />
                   </div>
                 </div>
 
@@ -2047,13 +2041,6 @@ function Dashboard({
           </form>
         </DialogContent>
       </Dialog>
-
-      <PixelEditorModal
-        isOpen={showPixelEditor}
-        onClose={() => setShowPixelEditor(false)}
-        onSave={(dataUrl) => setNewInstanceIcon(dataUrl)}
-        initialIcon={newInstanceIcon}
-      />
 
       {showCodeModal && (
         <ModpackCodeModal

@@ -496,6 +496,7 @@
         "sign_in_button": "Iniciar sessão com a Microsoft",
         "logging_in": "A iniciar sessão...",
         "failed": "Falha ao iniciar sessão",
+        "guest_mode": "Modo Convidado",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

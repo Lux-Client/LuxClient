@@ -496,6 +496,7 @@
         "sign_in_button": "Conectează-te cu Microsoft",
         "logging_in": "Se conectează...",
         "failed": "Conectare eșuată",
+        "guest_mode": "Mod invitat",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

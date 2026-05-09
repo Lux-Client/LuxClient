@@ -496,6 +496,7 @@
         "sign_in_button": "Prihlásiť sa cez Microsoft",
         "logging_in": "Prihlasovanie...",
         "failed": "Prihlásenie zlyhalo",
+        "guest_mode": "Režim hosťa",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {

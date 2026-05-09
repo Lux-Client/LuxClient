@@ -496,6 +496,7 @@
         "sign_in_button": "Accedi con Microsoft",
         "logging_in": "Accesso in corso...",
         "failed": "Accesso fallito",
+        "guest_mode": "Modalità ospite",
         "guest_restriction": "Login required to access this feature"
     },
     "settings": {
