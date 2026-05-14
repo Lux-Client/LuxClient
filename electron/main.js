@@ -929,7 +929,11 @@ app.on('open-url', (event, url) => {
 });
 
 app.whenReady().then(() => {
-    app.setAsDefaultProtocolClient('luxclient');
+    if (isDeveloperMode) {
+        app.setAsDefaultProtocolClient('luxclient', process.execPath, [path.resolve(process.argv[1])]);
+    } else {
+        app.setAsDefaultProtocolClient('luxclient');
+    }
     if (process.platform === 'darwin') {
         const dockIconPath = path.join(__dirname, '../resources/icon-mac.png');
         if (fs.existsSync(dockIconPath)) {
