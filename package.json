@@ -23,6 +23,12 @@
     "productName": "Lux",
     "compression": "normal",
     "icon": "resources/icon.png",
+    "protocols": [
+      {
+        "name": "Lux Client",
+        "schemes": ["luxclient"]
+      }
+    ],
     "publish": [
       {
         "provider": "github",
@@ -80,7 +86,13 @@
       "extendInfo": {
         "CFBundleName": "Lux",
         "CFBundleDisplayName": "Lux",
-        "CFBundleExecutable": "Lux"
+        "CFBundleExecutable": "Lux",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "Lux Client",
+            "CFBundleURLSchemes": ["luxclient"]
+          }
+        ]
       },
       "category": "public.app-category.games",
       "artifactName": "${productName}-setup.${ext}"
