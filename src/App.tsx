@@ -643,7 +643,9 @@ function App() {
                 });
                 try {
                     const result = await window.electronAPI.installExtension(payload.url);
-                    if (!result?.success) {
+                    if (result?.success) {
+                        window.dispatchEvent(new CustomEvent('luxclient:extension-installed'));
+                    } else {
                         console.error('[App] Extension install failed:', result?.error);
                     }
                 } catch (e) {

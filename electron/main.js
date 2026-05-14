@@ -169,6 +169,7 @@ let mainWindow;
 let splashWindow;
 let tray = null;
 let isQuiting = false;
+let pendingDeepLink = null;
 const isDeveloperMode = process.env.NODE_ENV === 'development';
 const updateAttemptStatePath = path.join(app.getPath('userData'), 'update-attempt-state.json');
 
@@ -592,6 +593,12 @@ function createWindow() {
             }
             mainWindow.show();
             mainWindow.focus();
+
+            if (pendingDeepLink) {
+                console.log('[DeepLink] flushing pendingDeepLink after window shown:', pendingDeepLink);
+                mainWindow.webContents.send('extension:install-from-marketplace', pendingDeepLink);
+                pendingDeepLink = null;
+            }
         }, 500);
     });
 
@@ -884,33 +891,42 @@ const handleDeepLink = (argv) => {
                     url: parsed.searchParams.get('url'),
                     name: parsed.searchParams.get('name'),
                 };
-                console.log('[Main] luxclient://install received:', payload);
+                console.log('[DeepLink] luxclient://install received:', payload);
 
                 const send = () => {
                     if (mainWindow && mainWindow.webContents) {
+                        console.log('[DeepLink] sending to renderer:', payload);
                         mainWindow.webContents.send('extension:install-from-marketplace', payload);
                         if (mainWindow.isMinimized()) mainWindow.restore();
                         mainWindow.focus();
+                        pendingDeepLink = null;
                     }
                 };
 
                 if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isLoading()) {
                     send();
                 } else if (mainWindow) {
+                    console.log('[DeepLink] window exists but loading, queuing for ready-to-show');
                     mainWindow.once('ready-to-show', send);
+                } else {
+                    console.log('[DeepLink] mainWindow not ready yet, storing as pendingDeepLink');
+                    pendingDeepLink = payload;
                 }
             }
         } catch (e) {
-            console.error('[Main] Failed to parse luxclient:// deep link:', e);
+            console.error('[DeepLink] Failed to parse luxclient:// deep link:', e);
         }
     }
 };
 
 const gotTheLock = app.requestSingleInstanceLock();
+console.log('[DeepLink] requestSingleInstanceLock result:', gotTheLock);
+console.log('[DeepLink] process.argv at startup:', process.argv);
 if (!gotTheLock) {
     app.quit();
 } else {
     app.on('second-instance', (event, commandLine, workingDirectory) => {
+        console.log('[DeepLink] second-instance fired, commandLine:', commandLine);
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.show();
@@ -924,15 +940,20 @@ if (!gotTheLock) {
 
 app.on('open-url', (event, url) => {
     event.preventDefault();
-    console.log('[Main] macOS open-url:', url);
+    console.log('[DeepLink] macOS open-url:', url);
     handleDeepLink([url]);
 });
 
 app.whenReady().then(() => {
-    if (isDeveloperMode) {
-        app.setAsDefaultProtocolClient('luxclient', process.execPath, [path.resolve(process.argv[1])]);
+    if (!app.isPackaged) {
+        const appPath = app.getAppPath();
+        const result = app.setAsDefaultProtocolClient('luxclient', process.execPath, [appPath]);
+        console.log('[DeepLink] dev mode registration — execPath:', process.execPath);
+        console.log('[DeepLink] dev mode registration — appPath:', appPath);
+        console.log('[DeepLink] setAsDefaultProtocolClient result:', result);
     } else {
-        app.setAsDefaultProtocolClient('luxclient');
+        const result = app.setAsDefaultProtocolClient('luxclient');
+        console.log('[DeepLink] prod mode setAsDefaultProtocolClient result:', result);
     }
     if (process.platform === 'darwin') {
         const dockIconPath = path.join(__dirname, '../resources/icon-mac.png');

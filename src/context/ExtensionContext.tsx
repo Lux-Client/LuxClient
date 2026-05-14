@@ -254,6 +254,10 @@ export const ExtensionProvider = ({ children }: { children: React.ReactNode }) =
 
     useEffect(() => {
         refreshExtensions();
+
+        const handleMarketplaceInstall = () => refreshExtensions();
+        window.addEventListener('luxclient:extension-installed', handleMarketplaceInstall);
+
         if (window.electronAPI && window.electronAPI.onExtensionFile) {
             const cleanup = window.electronAPI.onExtensionFile(async (filePath) => {
                 const confirm = window.confirm(`Do you want to install this extension?\n\n${filePath}`);
@@ -271,9 +275,15 @@ export const ExtensionProvider = ({ children }: { children: React.ReactNode }) =
                     }
                 }
             });
-            return cleanup;
+            return () => {
+                cleanup();
+                window.removeEventListener('luxclient:extension-installed', handleMarketplaceInstall);
+            };
         }
 
+        return () => {
+            window.removeEventListener('luxclient:extension-installed', handleMarketplaceInstall);
+        };
     }, []);
 
     const getViews = (slotName) => views[slotName] || [];
