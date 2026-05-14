@@ -1619,207 +1619,229 @@ function Dashboard({
       <PageHeader
         title={t("dashboard.title")}
         description={t("dashboard.desc")}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder={t("dashboard.search_placeholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-48 h-8 pl-8 text-xs"
-            />
-          </div>
-          <div className="w-36">
-            <Dropdown
-              options={sortOptions}
-              value={sortMethod}
-              onChange={setSortMethod}
-            />
-          </div>
-          <div className="w-36">
-            <Dropdown
-              options={groupOptions}
-              value={groupMethod}
-              onChange={setGroupMethod}
-            />
-          </div>
-          <div className="flex items-center gap-2 px-2 h-8 border border-border rounded-md bg-card">
-            <Switch
-              checked={groupBySourceEnabled}
-              onCheckedChange={setGroupBySourceEnabled}
-              className="h-3.5 w-7 [&>span]:h-2.5 [&>span]:w-2.5"
-            />
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-              {t("dashboard.group.launcher_toggle", "Group by Launcher")}
-            </span>
-          </div>
-
-          {!selectionMode ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={enableSelectionMode}
-            >
-              {t("dashboard.selection.enable", "Select")}
-            </Button>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 px-2 h-8 border border-primary/30 rounded-md bg-primary/10">
-                <span className="text-[11px] font-medium text-foreground whitespace-nowrap">
-                  {t("dashboard.selection.count", {
-                    count: selectedInstanceNames.length,
-                    defaultValue: `${selectedInstanceNames.length} selected`,
-                  })}
-                </span>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={selectAllVisible}
-              >
-                {t("dashboard.selection.select_all", "Select all visible")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={clearSelection}
-              >
-                {t("dashboard.selection.clear", "Clear")}
-              </Button>
-              <Button type="button" size="sm" onClick={openBulkMoveDialog}>
-                {t(
-                  "dashboard.selection.move_to_folder",
-                  "Move selected to folder",
-                )}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={disableSelectionMode}
-              >
-                {t("dashboard.selection.done", "Done")}
-              </Button>
-            </>
-          )}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="gap-1.5">
-                <Plus className="w-3.5 h-3.5" />
-                {t("dashboard.new_instance")}
-                <ChevronDown className="w-3 h-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => setShowCreateModal(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                {t("dashboard.manual_creation")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={async () => {
-                  try {
-                    if (!window.electronAPI.importFile) {
-                      throw new Error(
-                        "electronAPI.importFile is not defined. Please restart the application.",
-                      );
-                    }
-                    const result = await window.electronAPI.importFile();
-                    if (result.success) {
-                      addNotification(
-                        `Importing Modpack: ${result.instanceName}...`,
-                        "info",
-                      );
-                      loadInstances();
-                    } else if (result.error !== "Cancelled") {
-                      addNotification(
-                        `Import failed: ${result.error}`,
-                        "error",
-                      );
-                    }
-                  } catch (err) {
-                    console.error("[Dashboard] Import error:", err);
-                    addNotification(`Import error: ${err.message}`, "error");
-                  }
-                }}
-              >
-                <FileDown className="w-4 h-4 mr-2" />
-                {t("dashboard.import_file")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowCodeModal(true)}>
-                <FileCode className="w-4 h-4 mr-2" />
-                {t("dashboard.import_code")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </PageHeader>
+      />
 
       <PageContent>
-        {isEmpty ? (
-          <EmptyState
-            icon={Box}
-            title={t("dashboard.no_instances")}
-            description={t("dashboard.create_to_start")}
-            action={
-              <Button
-                size="sm"
-                onClick={() => setShowCreateModal(true)}
-                className="gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {t("dashboard.new_instance")}
-              </Button>
-            }
-          />
-        ) : (
-          <div className="h-full w-full">
-            <AutoSizer
-              renderProp={({ height, width }) => {
-                const COLS = Math.max(1, Math.floor((width - 20) / 270));
+        <div className="flex h-full flex-col gap-3">
+          <div className="rounded-2xl border border-border/80 bg-card/60 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={t("dashboard.search_placeholder")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 rounded-xl border-border/80 bg-background/80 pl-8 text-xs"
+                />
+              </div>
+              <div className="w-[150px]">
+                <Dropdown
+                  options={sortOptions}
+                  value={sortMethod}
+                  onChange={setSortMethod}
+                />
+              </div>
+              <div className="w-[150px]">
+                <Dropdown
+                  options={groupOptions}
+                  value={groupMethod}
+                  onChange={setGroupMethod}
+                />
+              </div>
+              <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-background/70 px-3">
+                <Switch
+                  checked={groupBySourceEnabled}
+                  onCheckedChange={setGroupBySourceEnabled}
+                  className="h-3.5 w-7 [&>span]:h-2.5 [&>span]:w-2.5"
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  {t("dashboard.group.launcher_toggle", "Group by Launcher")}
+                </span>
+              </div>
 
-                // Flattening the instance grids into rows based on columns
-                const finalRows: any[] = [];
-                virtualItems.forEach((item) => {
-                  if (item.type === "instance-grid") {
-                    for (let i = 0; i < item.instances.length; i += COLS) {
-                      finalRows.push({
-                        ...item,
-                        type: "instance-row",
-                        instances: item.instances.slice(i, i + COLS),
-                        key: `${item.key}-row-${i}`,
-                        cols: COLS,
-                      });
-                    }
-                  } else {
-                    finalRows.push(item);
-                  }
-                });
+              {!selectionMode ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={enableSelectionMode}
+                  className="rounded-xl"
+                >
+                  {t("dashboard.selection.enable", "Select")}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={disableSelectionMode}
+                  className="rounded-xl"
+                >
+                  {t("dashboard.selection.done", "Done")}
+                </Button>
+              )}
 
-                return (
-                  <List
-                    rowCount={finalRows.length}
-                    rowHeight={(index: number) => {
-                      const item = finalRows[index];
-                      if (item.type === "section-header") return 52;
-                      if (item.type === "folder-header") return 42;
-                      return 145; // instance-row
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="gap-1.5 rounded-xl">
+                    <Plus className="w-3.5 h-3.5" />
+                    {t("dashboard.new_instance")}
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => setShowCreateModal(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t("dashboard.manual_creation")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        if (!window.electronAPI.importFile) {
+                          throw new Error(
+                            "electronAPI.importFile is not defined. Please restart the application.",
+                          );
+                        }
+                        const result = await window.electronAPI.importFile();
+                        if (result.success) {
+                          addNotification(
+                            `Importing Modpack: ${result.instanceName}...`,
+                            "info",
+                          );
+                          loadInstances();
+                        } else if (result.error !== "Cancelled") {
+                          addNotification(
+                            `Import failed: ${result.error}`,
+                            "error",
+                          );
+                        }
+                      } catch (err) {
+                        console.error("[Dashboard] Import error:", err);
+                        addNotification(`Import error: ${err.message}`, "error");
+                      }
                     }}
-                    className="custom-scrollbar"
-                    rowProps={{ rows: finalRows, renderCard: renderInstanceCard, toggleFolder }}
-                    rowComponent={InstanceListRow}
-                  />
-                );
-              }}
-            />
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    {t("dashboard.import_file")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowCodeModal(true)}>
+                    <FileCode className="w-4 h-4 mr-2" />
+                    {t("dashboard.import_code")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {selectionMode && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2">
+                <div className="flex h-8 items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-2">
+                  <span className="text-[11px] font-medium text-foreground">
+                    {t("dashboard.selection.count", {
+                      count: selectedInstanceNames.length,
+                      defaultValue: `${selectedInstanceNames.length} selected`,
+                    })}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={selectAllVisible}
+                  className="rounded-xl"
+                >
+                  {t("dashboard.selection.select_all", "Select all visible")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={clearSelection}
+                  className="rounded-xl"
+                >
+                  {t("dashboard.selection.clear", "Clear")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={openBulkMoveDialog}
+                  className="rounded-xl"
+                >
+                  {t(
+                    "dashboard.selection.move_to_folder",
+                    "Move selected to folder",
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
-        )}
+
+          {isEmpty ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <EmptyState
+                icon={Box}
+                title={t("dashboard.no_instances")}
+                description={t("dashboard.create_to_start")}
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCreateModal(true)}
+                    className="gap-1.5 rounded-xl"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {t("dashboard.new_instance")}
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1">
+              <AutoSizer
+                renderProp={({ width }) => {
+                  const COLS = Math.max(1, Math.floor((width - 20) / 270));
+
+                  // Flattening the instance grids into rows based on columns
+                  const finalRows: any[] = [];
+                  virtualItems.forEach((item) => {
+                    if (item.type === "instance-grid") {
+                      for (let i = 0; i < item.instances.length; i += COLS) {
+                        finalRows.push({
+                          ...item,
+                          type: "instance-row",
+                          instances: item.instances.slice(i, i + COLS),
+                          key: `${item.key}-row-${i}`,
+                          cols: COLS,
+                        });
+                      }
+                    } else {
+                      finalRows.push(item);
+                    }
+                  });
+
+                  return (
+                    <List
+                      rowCount={finalRows.length}
+                      rowHeight={(index: number) => {
+                        const item = finalRows[index];
+                        if (item.type === "section-header") return 52;
+                        if (item.type === "folder-header") return 42;
+                        return 145; // instance-row
+                      }}
+                      className="custom-scrollbar"
+                      rowProps={{
+                        rows: finalRows,
+                        renderCard: renderInstanceCard,
+                        toggleFolder,
+                      }}
+                      rowComponent={InstanceListRow}
+                    />
+                  );
+                }}
+              />
+            </div>
+          )}
+        </div>
       </PageContent>
 
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>

@@ -129,6 +129,31 @@ function Home({
     focusMode: false,
   });
 
+  const shouldShowLibraryVisibleInstance = (instance, activeSettings = {}) => {
+    const isExternal =
+      String(instance?.instanceType || "").toLowerCase() === "external";
+    if (!isExternal) {
+      return true;
+    }
+
+    const source = String(instance?.externalSource || "").toLowerCase();
+    if (
+      source === "modrinth" &&
+      activeSettings?.showModrinthInstancesInLibrary === false
+    ) {
+      return false;
+    }
+
+    if (
+      source === "curseforge" &&
+      activeSettings?.showCurseforgeInstancesInLibrary === false
+    ) {
+      return false;
+    }
+
+    return true;
+  };
+
   useEffect(() => {
     loadModIds();
     loadInstances();
@@ -150,6 +175,7 @@ function Home({
 
     const cleanupSettings = window.electronAPI.onSettingsUpdated?.((s) => {
       setSettings(s);
+      loadInstances(s);
       loadModpacks();
     });
 
@@ -305,9 +331,21 @@ function Home({
     }
   }, [currentModId]);
 
-  const loadInstances = async () => {
+  const loadInstances = async (settingsOverride = null) => {
     const list = await window.electronAPI.getInstances();
-    const launcherInstances = filterInstancesForMode(list, "launcher");
+    let effectiveSettings = settingsOverride;
+    if (!effectiveSettings) {
+      try {
+        const settingsRes = await window.electronAPI.getSettings();
+        if (settingsRes?.success && settingsRes.settings) {
+          effectiveSettings = settingsRes.settings;
+        }
+      } catch (e) {}
+    }
+
+    const launcherInstances = filterInstancesForMode(list, "launcher").filter(
+      (instance) => shouldShowLibraryVisibleInstance(instance, effectiveSettings || {}),
+    );
     setInstances(launcherInstances);
     if (launcherInstances.length > 0) {
       const recentInsts = [...launcherInstances]
