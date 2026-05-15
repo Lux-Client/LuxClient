@@ -520,6 +520,42 @@ module.exports = (ipcMain, mainWindow) => {
         return { valid: true };
     }
 
+    async function loadBundledPluginConfigs() {
+        const bundledConfigSchemaDir = await resolveBundledConfigSchemaDir();
+        if (!bundledConfigSchemaDir) {
+            return [];
+        }
+
+        const bundledConfigFiles = (await fs.readdir(bundledConfigSchemaDir))
+            .filter(file => file.toLowerCase().endsWith('.json'));
+
+        const bundledConfigs = [];
+        for (const configFile of bundledConfigFiles) {
+            const fullPath = path.join(bundledConfigSchemaDir, configFile);
+            const configBaseName = configFile.replace(/\.json$/i, '');
+
+            try {
+                const config = await fs.readJson(fullPath);
+                const validation = validatePluginConfig(config);
+                if (!validation.valid) {
+                    continue;
+                }
+
+                const rawName = config.pluginName || config.modName || config.displayName || configBaseName;
+                bundledConfigs.push({
+                    configFile,
+                    configBaseName,
+                    pluginName: String(rawName || configBaseName),
+                    config
+                });
+            } catch (error) {
+                console.warn(`[Servers] Skipping invalid bundled plugin config ${configFile}: ${error.message}`);
+            }
+        }
+
+        return bundledConfigs;
+    }
+
     ipcMain.handle('server:check-eula', async (event, serverName) => {
         try {
             console.log(`[Servers] Checking EULA for ${serverName}`);
@@ -2284,37 +2320,24 @@ eula=false
                 }
             }
 
-            const bundledConfigSchemaDir = await resolveBundledConfigSchemaDir();
-            if (bundledConfigSchemaDir) {
-                const bundledConfigFiles = (await fs.readdir(bundledConfigSchemaDir))
-                    .filter(file => file.toLowerCase().endsWith('.json'));
-
-                for (const configFile of bundledConfigFiles) {
-                    const configBaseName = configFile.replace(/\.json$/i, '');
-                    const mapKey = configBaseName.toLowerCase();
-                    if (configuredEntriesMap.has(mapKey)) {
-                        continue;
-                    }
-
-                    const pluginConfigPath = path.join(sourceDir, configBaseName, 'config.yml');
-                    if (!await fs.pathExists(pluginConfigPath)) {
-                        continue;
-                    }
-
-                    const fullPath = path.join(bundledConfigSchemaDir, configFile);
-                    try {
-                        const config = await fs.readJson(fullPath);
-                        const rawName = config.pluginName || config.modName || config.displayName || configBaseName;
-                        addConfiguredEntry({
-                            configFile,
-                            configBaseName,
-                            pluginName: rawName,
-                            config
-                        });
-                    } catch (error) {
-                        console.warn(`[Servers] Skipping invalid bundled plugin config ${configFile}: ${error.message}`);
-                    }
+            const bundledConfigs = await loadBundledPluginConfigs();
+            for (const bundledConfig of bundledConfigs) {
+                const mapKey = bundledConfig.configBaseName.toLowerCase();
+                if (configuredEntriesMap.has(mapKey)) {
+                    continue;
                 }
+
+                const pluginConfigPath = path.join(sourceDir, bundledConfig.configBaseName, 'config.yml');
+                if (!await fs.pathExists(pluginConfigPath)) {
+                    continue;
+                }
+
+                addConfiguredEntry({
+                    configFile: bundledConfig.configFile,
+                    configBaseName: bundledConfig.configBaseName,
+                    pluginName: bundledConfig.pluginName,
+                    config: bundledConfig.config
+                });
             }
 
             const configuredEntries = Array.from(configuredEntriesMap.values());
@@ -2338,7 +2361,11 @@ eula=false
                 success: true,
                 itemType: target.type,
                 configuredPlugins,
-                unconfiguredPlugins
+                unconfiguredPlugins,
+                supportedPlugins: bundledConfigs.map(entry => ({
+                    pluginName: entry.pluginName,
+                    configFile: entry.configFile
+                }))
             };
         } catch (error) {
             console.error(`[Servers] Error listing plugin configs for ${serverName}:`, error);

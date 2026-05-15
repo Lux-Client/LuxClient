@@ -3,7 +3,7 @@
   "name": "lux",
   "description": "Lux Client",
   "author": "Lux Team <lux@pluginhub.de>",
-  "version": "1.6.21",
+  "version": "1.6.22",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
@@ -166,6 +166,7 @@
     "react-simple-code-editor": "^0.14.1",
     "react-virtualized-auto-sizer": "^2.0.3",
     "react-window": "^2.2.7",
+    "recharts": "^3.8.1",
     "skinview3d": "^3.4.1",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",

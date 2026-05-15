@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNotification } from '../context/NotificationContext';
 import { useTranslation } from 'react-i18next';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import LoadingOverlay from '../components/LoadingOverlay';
 import FileBrowser from '../components/FileBrowser';
 import { getSourceTags } from '../utils/sourceTags';
@@ -16,6 +17,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         cpu: 0,
         memory: 0,
         players: [],
+        playerCount: 0,
         uptime: 0,
 
         history: {
@@ -53,6 +55,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
     const [isSavingProperties, setIsSavingProperties] = useState(false);
     const [configuredPluginConfigs, setConfiguredPluginConfigs] = useState([]);
     const [unconfiguredPlugins, setUnconfiguredPlugins] = useState([]);
+    const [supportedPluginConfigs, setSupportedPluginConfigs] = useState([]);
     const [selectedPluginConfigFile, setSelectedPluginConfigFile] = useState('');
     const [pluginConfigSearch, setPluginConfigSearch] = useState('');
     const [isLoadingPluginConfigs, setIsLoadingPluginConfigs] = useState(false);
@@ -103,32 +106,59 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         }
     };
     const extractPlayerEvents = (line) => {
+        const cleanLine = stripAnsi(line);
+        if (!cleanLine) return;
 
-        const joinMatch = line.match(/\[([^\]]+)\]: (.+) joined the game/);
+        const joinMatch = cleanLine.match(/\[([^\]]+)\]:\s*(.+?)\s+joined the game/i);
         if (joinMatch) {
-            const playerName = joinMatch[2];
+            const playerName = String(joinMatch[2] || '').trim();
             handlePlayerJoin(playerName);
             return;
         }
-        const leaveMatch = line.match(/\[([^\]]+)\]: (.+) left the game/);
+        const loginMatch = cleanLine.match(/\[([^\]]+)\]:\s*([A-Za-z0-9_]{1,16})\[\/[^\]]+\]\s+logged in with entity id/i);
+        if (loginMatch) {
+            const playerName = String(loginMatch[2] || '').trim();
+            handlePlayerJoin(playerName);
+            return;
+        }
+        const leaveMatch = cleanLine.match(/\[([^\]]+)\]:\s*(.+?)\s+(?:left the game|lost connection:.*)/i);
         if (leaveMatch) {
-            const playerName = leaveMatch[2];
+            const playerName = String(leaveMatch[2] || '').trim();
             handlePlayerLeave(playerName);
             return;
         }
-        const listMatch = line.match(/There are (\d+) of a max of (\d+) players online: (.+)/);
+        const listMatch = cleanLine.match(/There are (\d+) of a max of (\d+) players online(?::\s*(.*))?/i);
         if (listMatch) {
-            const onlinePlayers = listMatch[3].split(', ').filter(p => p.trim());
+            const onlinePlayers = String(listMatch[3] || '')
+                .split(',')
+                .map(player => player.trim())
+                .filter(Boolean);
             updateOnlinePlayers(onlinePlayers);
             return;
         }
     };
     const handlePlayerJoin = (playerName) => {
-        setOfflinePlayers(prev => prev.filter(p => p.name !== playerName));
+        const normalizedName = String(playerName || '').trim();
+        if (!normalizedName) return;
+
+        setOfflinePlayers(prev => prev.filter(p => p.name !== normalizedName));
+        setServerStats(prev => {
+            const existingPlayers = Array.isArray(prev.players) ? prev.players : [];
+            if (existingPlayers.includes(normalizedName)) {
+                return prev;
+            }
+
+            const nextPlayers = [...existingPlayers, normalizedName];
+            return {
+                ...prev,
+                players: nextPlayers,
+                playerCount: nextPlayers.length
+            };
+        });
 
         setPlayerStats(prev => {
             const now = Date.now();
-            const stats = prev[playerName] || {
+            const stats = prev[normalizedName] || {
                 firstSeen: now,
                 lastSeen: now,
                 playtime: 0,
@@ -136,7 +166,7 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
             };
             return {
                 ...prev,
-                [playerName]: {
+                [normalizedName]: {
                     ...stats,
                     lastSeen: now,
                     joins: (stats.joins || 0) + 1
@@ -145,22 +175,41 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         });
     };
     const handlePlayerLeave = (playerName) => {
+        const normalizedName = String(playerName || '').trim();
+        if (!normalizedName) return;
+
+        setServerStats(prev => ({
+            ...prev,
+            players: (prev.players || []).filter(player => player !== normalizedName),
+            playerCount: Math.max((prev.players || []).filter(player => player !== normalizedName).length, 0)
+        }));
+        setSelectedPlayers(prev => prev.filter(player => player !== normalizedName));
+
         setOfflinePlayers(prev => {
-            if (!prev.find(p => p.name === playerName)) {
+            if (!prev.find(p => p.name === normalizedName)) {
                 return [...prev, {
-                    name: playerName,
+                    name: normalizedName,
                     lastSeen: new Date().toISOString(),
-                    playtime: calculatePlaytime(playerName)
+                    playtime: calculatePlaytime(normalizedName)
                 }];
             }
             return prev;
         });
     };
     const updateOnlinePlayers = (players) => {
+        const normalizedPlayers = [...new Set(
+            (Array.isArray(players) ? players : [])
+                .map(player => String(player || '').trim())
+                .filter(Boolean)
+        )];
+
         setServerStats(prev => ({
             ...prev,
-            players: players
+            players: normalizedPlayers,
+            playerCount: normalizedPlayers.length
         }));
+        setOfflinePlayers(prev => prev.filter(player => !normalizedPlayers.includes(player.name)));
+        setSelectedPlayers(prev => prev.filter(player => normalizedPlayers.includes(player)));
     };
     const calculatePlaytime = (playerName) => {
         return 0;
@@ -233,9 +282,11 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
 
             const configured = Array.isArray(result.configuredPlugins) ? result.configuredPlugins : [];
             const pending = Array.isArray(result.unconfiguredPlugins) ? result.unconfiguredPlugins : [];
+            const supported = Array.isArray(result.supportedPlugins) ? result.supportedPlugins : [];
 
             setConfiguredPluginConfigs(configured);
             setUnconfiguredPlugins(pending);
+            setSupportedPluginConfigs(supported);
 
             setSelectedPluginConfigFile((prev) => {
                 if (configured.some(plugin => plugin.configFile === prev)) {
@@ -292,6 +343,14 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         if (!pluginConfigSearch.trim()) return true;
         const query = pluginConfigSearch.toLowerCase();
         return plugin.pluginName?.toLowerCase().includes(query) || plugin.jarName?.toLowerCase().includes(query);
+    });
+    const filteredSupportedPluginConfigs = supportedPluginConfigs.filter((plugin) => {
+        if (!pluginConfigSearch.trim()) return true;
+        const query = pluginConfigSearch.toLowerCase();
+        return (
+            plugin.pluginName?.toLowerCase().includes(query) ||
+            plugin.configFile?.toLowerCase().includes(query)
+        );
     });
 
     const updatePluginFieldValue = (fieldKey, value) => {
@@ -545,6 +604,15 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                 console.log(`[ServerDetails] Status update for ${serverName}: ${status}`, updatedServer);
                 setCurrentStatus(status);
 
+                if (status !== 'running') {
+                    setServerStats(prev => ({
+                        ...prev,
+                        players: [],
+                        playerCount: 0
+                    }));
+                    setSelectedPlayers([]);
+                }
+
                 if (updatedServer && onServerUpdate) {
                     onServerUpdate(updatedServer);
                 }
@@ -584,7 +652,8 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                         cpu: cpu || 0,
                         memory: memory || 0,
                         uptime: uptime || 0,
-                        players: players || [],
+                        playerCount: resolvedPlayerCount,
+                        players: Array.isArray(players) && players.length > 0 ? players : prev.players,
                         history: newHistory
                     };
                 });
@@ -681,6 +750,14 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
             const status = await window.electronAPI.getServerStatus(server.name);
             if (status && status !== currentStatus) {
                 setCurrentStatus(status);
+                if (status !== 'running') {
+                    setServerStats(prev => ({
+                        ...prev,
+                        players: [],
+                        playerCount: 0
+                    }));
+                    setSelectedPlayers([]);
+                }
             }
         } catch (error) {
             console.error('Failed to check server status:', error);
@@ -718,7 +795,8 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                 ...stats,
                 cpu: stats?.cpu || 0,
                 memory: stats?.memory || 0,
-                players: stats?.players || [],
+                playerCount: resolvedPlayerCount,
+                players: Array.isArray(stats?.players) && stats.players.length > 0 ? stats.players : prev.players,
                 uptime: stats?.uptime || 0,
                 history: {
                     cpu: [...prev.history.cpu, stats?.cpu || 0].slice(-60),
@@ -730,31 +808,6 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
         } catch (error) {
             console.error('Failed to load server stats:', error);
         }
-    };
-
-    const buildSparklinePoints = (values, maxValue) => {
-        const width = 100;
-        const height = 44;
-
-        if (!Array.isArray(values) || values.length === 0) {
-            return '';
-        }
-
-        const safeMax = Math.max(maxValue || 1, 1);
-        return values.map((value, index) => {
-            const x = values.length === 1
-                ? width
-                : (index / (values.length - 1)) * width;
-            const y = height - (Math.min(Math.max(value, 0), safeMax) / safeMax) * height;
-            return `${x},${y}`;
-        }).join(' ');
-    };
-
-    const buildSparklineArea = (polylinePoints) => {
-        if (!polylinePoints) return '';
-        const points = polylinePoints.split(' ');
-        if (points.length === 0) return '';
-        return `0,44 ${polylinePoints} 100,44`;
     };
 
     const averageOf = (values) => {
@@ -1245,6 +1298,24 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
     const filteredOfflinePlayers = offlinePlayers.filter(p =>
         p.name.toLowerCase().includes(playerSearch.toLowerCase())
     );
+    const cpuHistory = Array.isArray(serverStats.history?.cpu) ? serverStats.history.cpu : [];
+    const memoryHistory = Array.isArray(serverStats.history?.memory) ? serverStats.history.memory : [];
+    const playersHistory = Array.isArray(serverStats.history?.playerCount) ? serverStats.history.playerCount : [];
+    const chartTimestamps = Array.isArray(serverStats.history?.timestamps) ? serverStats.history.timestamps : [];
+    const maxPlayers = Math.max(Number(server.maxPlayers) || 20, ...playersHistory, 1);
+    const memoryMax = Math.max(1024, ...memoryHistory, 1);
+    const currentPlayerCount = Number.isFinite(serverStats.playerCount)
+        ? serverStats.playerCount
+        : (serverStats.players?.length || 0);
+    const telemetryChartData = useMemo(() => {
+        const maxLength = Math.max(cpuHistory.length, memoryHistory.length, playersHistory.length, chartTimestamps.length, 0);
+        return Array.from({ length: maxLength }, (_value, index) => ({
+            time: chartTimestamps[index] || `#${index + 1}`,
+            cpu: Math.max(0, Number(cpuHistory[index] || 0)),
+            memory: Math.max(0, Number(memoryHistory[index] || 0)),
+            players: Math.max(0, Number(playersHistory[index] || 0))
+        }));
+    }, [cpuHistory, memoryHistory, playersHistory, chartTimestamps]);
 
     return (
         <div className="h-full flex flex-col bg-background">
@@ -1951,110 +2022,137 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                     </div>
                 )}
 
-                {activeTab === 'charts' && (() => {
-                    const cpuHistory = serverStats.history.cpu;
-                    const memoryHistory = serverStats.history.memory;
-                    const playersHistory = serverStats.history.playerCount;
-                    const maxPlayers = Math.max(server.maxPlayers || 20, ...playersHistory, 1);
-                    const memoryMax = Math.max(1024, ...memoryHistory, 1);
-
-                    const cpuPoints = buildSparklinePoints(cpuHistory, 100);
-                    const memoryPoints = buildSparklinePoints(memoryHistory, memoryMax);
-                    const playersPoints = buildSparklinePoints(playersHistory, maxPlayers);
-
-                    return (
-                        <div className="flex flex-col h-full gap-5">
-                            <div className="flex items-end justify-between gap-3">
-                                <div>
-                                    <h2 className="text-xl font-bold text-foreground">Performance Dashboard</h2>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Last 60 samples - live telemetry</p>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Server Status</div>
-                                    <div className={`text-sm font-bold ${currentStatus === 'running' ? 'text-green-400' : currentStatus === 'starting' ? 'text-amber-300' : 'text-red-400'}`}>
-                                        {String(currentStatus || 'unknown').toUpperCase()}
-                                    </div>
-                                </div>
+                {activeTab === 'charts' && (
+                    <div className="flex flex-col h-full gap-5">
+                        <div className="flex items-end justify-between gap-3">
+                            <div>
+                                <h2 className="text-xl font-bold text-foreground">Performance Dashboard</h2>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Last 60 samples - live telemetry</p>
                             </div>
-
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
-                                    <div className="text-[11px] uppercase tracking-wider text-blue-200">CPU now</div>
-                                    <div className="text-2xl font-extrabold text-blue-100 mt-1">{Math.round(serverStats.cpu || 0)}%</div>
-                                    <div className="text-xs text-blue-200/80 mt-1">avg {Math.round(averageOf(cpuHistory))}%</div>
-                                </div>
-                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                                    <div className="text-[11px] uppercase tracking-wider text-emerald-200">RAM now</div>
-                                    <div className="text-2xl font-extrabold text-emerald-100 mt-1">{Math.round(serverStats.memory || 0)} MB</div>
-                                    <div className="text-xs text-emerald-200/80 mt-1">avg {Math.round(averageOf(memoryHistory))} MB</div>
-                                </div>
-                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
-                                    <div className="text-[11px] uppercase tracking-wider text-amber-200">Players now</div>
-                                    <div className="text-2xl font-extrabold text-amber-100 mt-1">{serverStats.players?.length || 0}</div>
-                                    <div className="text-xs text-amber-200/80 mt-1">peak {Math.max(...playersHistory, 0)}</div>
-                                </div>
-                                <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
-                                    <div className="text-[11px] uppercase tracking-wider text-fuchsia-200">Uptime</div>
-                                    <div className="text-2xl font-extrabold text-fuchsia-100 mt-1">{Math.floor((serverStats.uptime || 0) / 60)}m</div>
-                                    <div className="text-xs text-fuchsia-200/80 mt-1">{serverStats.uptime || 0}s total</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                                <div className="rounded-xl border border-border bg-card/50 p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="font-semibold text-blue-200">CPU Usage</h3>
-                                        <span className="text-xs text-muted-foreground">max 100%</span>
-                                    </div>
-                                    <svg viewBox="0 0 100 44" className="w-full h-28">
-                                        <defs>
-                                            <linearGradient id={`${chartIdBase}-cpu`} x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.45" />
-                                                <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.04" />
-                                            </linearGradient>
-                                        </defs>
-                                        <polygon points={buildSparklineArea(cpuPoints)} fill={`url(#${chartIdBase}-cpu)`} />
-                                        <polyline points={cpuPoints} fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-
-                                <div className="rounded-xl border border-border bg-card/50 p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="font-semibold text-emerald-200">Memory Usage</h3>
-                                        <span className="text-xs text-muted-foreground">max {Math.round(memoryMax)} MB</span>
-                                    </div>
-                                    <svg viewBox="0 0 100 44" className="w-full h-28">
-                                        <defs>
-                                            <linearGradient id={`${chartIdBase}-memory`} x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
-                                                <stop offset="100%" stopColor="#34d399" stopOpacity="0.04" />
-                                            </linearGradient>
-                                        </defs>
-                                        <polygon points={buildSparklineArea(memoryPoints)} fill={`url(#${chartIdBase}-memory)`} />
-                                        <polyline points={memoryPoints} fill="none" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-
-                                <div className="rounded-xl border border-border bg-card/50 p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="font-semibold text-amber-200">Player Count</h3>
-                                        <span className="text-xs text-muted-foreground">max {maxPlayers}</span>
-                                    </div>
-                                    <svg viewBox="0 0 100 44" className="w-full h-28">
-                                        <defs>
-                                            <linearGradient id={`${chartIdBase}-players`} x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.45" />
-                                                <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.04" />
-                                            </linearGradient>
-                                        </defs>
-                                        <polygon points={buildSparklineArea(playersPoints)} fill={`url(#${chartIdBase}-players)`} />
-                                        <polyline points={playersPoints} fill="none" stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round" />
-                                    </svg>
+                            <div className="text-right">
+                                <div className="text-xs uppercase tracking-wider text-muted-foreground">Server Status</div>
+                                <div className={`text-sm font-bold ${currentStatus === 'running' ? 'text-green-400' : currentStatus === 'starting' ? 'text-amber-300' : 'text-red-400'}`}>
+                                    {String(currentStatus || 'unknown').toUpperCase()}
                                 </div>
                             </div>
                         </div>
-                    );
-                })()}
+
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
+                                <div className="text-[11px] uppercase tracking-wider text-blue-200">CPU now</div>
+                                <div className="text-2xl font-extrabold text-blue-100 mt-1">{Math.round(serverStats.cpu || 0)}%</div>
+                                <div className="text-xs text-blue-200/80 mt-1">avg {Math.round(averageOf(cpuHistory))}%</div>
+                            </div>
+                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                                <div className="text-[11px] uppercase tracking-wider text-emerald-200">RAM now</div>
+                                <div className="text-2xl font-extrabold text-emerald-100 mt-1">{Math.round(serverStats.memory || 0)} MB</div>
+                                <div className="text-xs text-emerald-200/80 mt-1">avg {Math.round(averageOf(memoryHistory))} MB</div>
+                            </div>
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+                                <div className="text-[11px] uppercase tracking-wider text-amber-200">Players now</div>
+                                <div className="text-2xl font-extrabold text-amber-100 mt-1">{currentPlayerCount}</div>
+                                <div className="text-xs text-amber-200/80 mt-1">peak {Math.max(...playersHistory, 0)}</div>
+                            </div>
+                            <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4">
+                                <div className="text-[11px] uppercase tracking-wider text-fuchsia-200">Uptime</div>
+                                <div className="text-2xl font-extrabold text-fuchsia-100 mt-1">{Math.floor((serverStats.uptime || 0) / 60)}m</div>
+                                <div className="text-xs text-fuchsia-200/80 mt-1">{serverStats.uptime || 0}s total</div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                            <div className="rounded-xl border border-border bg-card/50 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-blue-200">CPU Usage</h3>
+                                    <span className="text-xs text-muted-foreground">max 100%</span>
+                                </div>
+                                <div className="h-64 rounded-lg border border-blue-500/20 bg-gradient-to-b from-blue-500/10 to-transparent p-2">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={telemetryChartData} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id={`${chartIdBase}-cpu`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.45} />
+                                                    <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.04} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" vertical={false} />
+                                            <XAxis dataKey="time" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                                            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(value) => `${Math.round(value)}%`} />
+                                            <Tooltip
+                                                cursor={{ stroke: '#60a5fa', strokeOpacity: 0.35, strokeWidth: 1.5 }}
+                                                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', border: '1px solid rgba(96, 165, 250, 0.35)', borderRadius: '0.75rem', color: '#e2e8f0' }}
+                                                labelStyle={{ color: '#93c5fd', fontWeight: 700 }}
+                                                formatter={(value) => [`${Math.round(Number(value) || 0)}%`, 'CPU']}
+                                                labelFormatter={(label) => `Time: ${label}`}
+                                            />
+                                            <Area type="monotone" dataKey="cpu" stroke="#60a5fa" fill={`url(#${chartIdBase}-cpu)`} strokeWidth={2.25} dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#1e3a8a', fill: '#60a5fa' }} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-border bg-card/50 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-emerald-200">Memory Usage</h3>
+                                    <span className="text-xs text-muted-foreground">max {Math.round(memoryMax)} MB</span>
+                                </div>
+                                <div className="h-64 rounded-lg border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-2">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={telemetryChartData} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id={`${chartIdBase}-memory`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#34d399" stopOpacity={0.45} />
+                                                    <stop offset="100%" stopColor="#34d399" stopOpacity={0.04} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" vertical={false} />
+                                            <XAxis dataKey="time" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                                            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, Math.max(memoryMax, 1)]} tickFormatter={(value) => `${Math.round(value)} MB`} />
+                                            <Tooltip
+                                                cursor={{ stroke: '#34d399', strokeOpacity: 0.35, strokeWidth: 1.5 }}
+                                                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', border: '1px solid rgba(52, 211, 153, 0.35)', borderRadius: '0.75rem', color: '#e2e8f0' }}
+                                                labelStyle={{ color: '#6ee7b7', fontWeight: 700 }}
+                                                formatter={(value) => [`${Math.round(Number(value) || 0)} MB`, 'Memory']}
+                                                labelFormatter={(label) => `Time: ${label}`}
+                                            />
+                                            <Area type="monotone" dataKey="memory" stroke="#34d399" fill={`url(#${chartIdBase}-memory)`} strokeWidth={2.25} dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#064e3b', fill: '#34d399' }} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-border bg-card/50 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-amber-200">Player Count</h3>
+                                    <span className="text-xs text-muted-foreground">max {maxPlayers}</span>
+                                </div>
+                                <div className="h-64 rounded-lg border border-amber-500/20 bg-gradient-to-b from-amber-500/10 to-transparent p-2">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={telemetryChartData} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id={`${chartIdBase}-players`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.45} />
+                                                    <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.04} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" vertical={false} />
+                                            <XAxis dataKey="time" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={24} />
+                                            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, maxPlayers]} allowDecimals={false} />
+                                            <Tooltip
+                                                cursor={{ stroke: '#fbbf24', strokeOpacity: 0.35, strokeWidth: 1.5 }}
+                                                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '0.75rem', color: '#e2e8f0' }}
+                                                labelStyle={{ color: '#fcd34d', fontWeight: 700 }}
+                                                formatter={(value) => [`${Math.round(Number(value) || 0)}`, 'Players']}
+                                                labelFormatter={(label) => `Time: ${label}`}
+                                            />
+                                            <Area type="monotone" dataKey="players" stroke="#fbbf24" fill={`url(#${chartIdBase}-players)`} strokeWidth={2.25} dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#78350f', fill: '#fbbf24' }} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {activeTab === 'players' && (
 
@@ -3052,6 +3150,28 @@ function ServerDetails({ server, onBack, runningInstances, onServerUpdate, isGue
                                     placeholder={`Search ${configEntityLabel}...`}
                                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                 />
+
+                                <div className="rounded-lg border border-border/70 bg-background/40 p-3">
+                                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                                        Supported {configEntityLabel} templates
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar">
+                                        {filteredSupportedPluginConfigs.map((plugin) => (
+                                            <span
+                                                key={plugin.configFile || plugin.pluginName}
+                                                className="px-2.5 py-1 rounded-md bg-primary/15 text-primary text-xs font-semibold border border-primary/30"
+                                            >
+                                                {plugin.pluginName}
+                                            </span>
+                                        ))}
+
+                                        {filteredSupportedPluginConfigs.length === 0 && (
+                                            <div className="text-sm text-muted-foreground">
+                                                No supported {configEntityLabel} templates found.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
 
                                 <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto custom-scrollbar">
                                     {filteredConfiguredPluginConfigs.map((plugin) => (
